@@ -15,6 +15,8 @@ L’objectif de ce projet est de développer une application de matchmaking perm
     - [x] Formation des groupes
     - [x] Selon critères stricts (même âge, même sexe) 
     - [ ] Selon critères laxistes
+        - [x] Age
+        - [ ] Sexe
 
 - [ ] Offrir un service de messagerie instantanée en temps réel au sein de ces groupes, facilitant la communication.
     - [x] Messagerie instantanée
