@@ -62,7 +62,7 @@ void *receive_message(void *arg)
         }
 
         buffer[nbytes] = '\0'; // Ajouter un terminateur de chaîne
-        printf("Message reçu: %s\n", buffer);
+        printf("%s\n", buffer);
     }
 
     return NULL;
@@ -110,7 +110,7 @@ int main()
 
     // Envoyer les informations de matchmaking au serveur
     char auth_data[BUFFER_SIZE];
-    sprintf(auth_data, "%s %d %s", name, gender, age);
+    sprintf(auth_data, "%s %s %d", name, gender, age);
     if (send(sockfd, auth_data, strlen(auth_data), 0) < 0)
     {
         perror("Erreur lors de l'envoi des informations de matchmaking");
