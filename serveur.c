@@ -49,9 +49,9 @@ void matchmake_users() {
     for (int i = 0; i < client_count; i++) {
         if (clients[i].group_id == -1) { // Pas encore assigné à un groupe
             for (int j = i + 1; j < client_count; j++) {
-                if (clients[j].group_id == -1 && strcmp(clients[i].gender, clients[j].gender) == 0 && clients[i].age == clients[j].age) {
+                if (clients[j].group_id == -1 && strcmp(clients[i].gender, clients[j].gender) == 0 && abs(clients[i].age - clients[j].age) <= 10) {
                     for (int k = j + 1; k < client_count; k++) {
-                        if (clients[k].group_id == -1 && strcmp(clients[i].gender, clients[k].gender) == 0 && clients[i].age == clients[k].age) {
+                        if (clients[k].group_id == -1 && strcmp(clients[i].gender, clients[k].gender) == 0 && abs(clients[i].age - clients[k].age) <= 10) {
                             // Assigner à un groupe
                             int group_id = i + 1; // Génération d'un ID de groupe simple
                             clients[i].group_id = group_id;
