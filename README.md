@@ -7,7 +7,7 @@ L’objectif de ce projet est de développer une application de matchmaking perm
 
 - [ ] Permettre à plusieurs utilisateurs de se connecter à un serveur, de s’authentifier et de remplir un formulaire de première connexion avec des critères tels que le sexe et l'âge.
     - [x] Plusieurs utilisateurs se connectent au serveur 
-    - [ ] Authentification (login, mot de passe)
+    - [ ] Authentification (login)
     - [ ] Base de données (Back-end)
     - [x] Formulaire
 
@@ -19,7 +19,7 @@ L’objectif de ce projet est de développer une application de matchmaking perm
 - [ ] Offrir un service de messagerie instantanée en temps réel au sein de ces groupes, facilitant la communication.
     - [x] Messagerie instantanée
     - [ ] Persistente
-    - [ ] Possibilité de quitter le groupe (/quit)
+    - [x] Possibilité de quitter le groupe (/quit)
 
 ## Exigences techniques :
 

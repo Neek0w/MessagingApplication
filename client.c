@@ -28,6 +28,14 @@ void *send_message(void *arg) {
             perror("Erreur lors de l'envoi du message");
             exit(EXIT_FAILURE);
         }
+
+        // Vérifier si l'utilisateur veut quitter
+        if (strcmp(buffer, "/quit") == 0) {
+            printf("Déconnexion...\n");
+            close(sockfd);
+            exit(EXIT_SUCCESS);
+        }
+        
     }
 
     return NULL;
