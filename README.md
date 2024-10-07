@@ -26,3 +26,13 @@ L’objectif de ce projet est de développer une application de matchmaking perm
 - [ ] Gestion et authentification des utilisateurs.
 - [ ] Création de groupes de matchmaking basés sur les paramètres du formulaire (sexe, âge, etc.).
 - [ ] Messagerie en temps réel pour les groupes formés.
+
+## exigences client :
+
+- [ ] 1ère page login avec username ou création de compte (username, age, sexe)
+- [ ] 2ème page:
+    - [ ] consultation des groupes dont le user est membre
+    - [ ] demande de matchmaking
+- [ ] group chat page
+
+
