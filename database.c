@@ -31,11 +31,15 @@ void add_group(const char *group_name, char members[MAX_GROUP_MEMBERS][50], int 
         strncpy(groups[group_count].group_name, group_name, sizeof(groups[group_count].group_name) - 1);
         groups[group_count].group_name[sizeof(groups[group_count].group_name) - 1] = '\0'; // Ensure null-termination
         groups[group_count].member_count = member_count;
-        for (int i = 0; i < member_count; i++)
+
+        // Initialize members to empty strings
+        for (int i = 0; i < MAX_GROUP_MEMBERS; i++)
         {
-            strncpy(groups[group_count].members[i], members[i], sizeof(groups[group_count].members[i]) - 1);
-            groups[group_count].members[i][sizeof(groups[group_count].members[i]) - 1] = '\0'; // Ensure null-termination
+            groups[group_count].members[i][0] = '\0';
         }
+
+        // Remove the loop that copies the actual member names
+
         group_count++;
     }
     else
