@@ -10,6 +10,26 @@
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 1024
 
+void add_client(const char *username, int fd) {
+    if (client_count < MAX_CLIENTS) {
+        strncpy(clients[client_count].username, username, sizeof(clients[client_count].username) - 1);
+        clients[client_count].fd = fd;
+        client_count++;
+    } else {
+        printf("Max clients reached, cannot add more clients.\n");
+    }
+}
+
+void remove_client(int fd) {
+    for (int i = 0; i < client_count; i++) {
+        if (clients[i].fd == fd) {
+            clients[i] = clients[client_count - 1]; 
+            client_count--;
+            break;
+        }
+    }
+}
+
 void handle_login(int client_fd, char *username, char *password)
 {
     for (int i = 0; i < user_count; i++)
@@ -17,6 +37,7 @@ void handle_login(int client_fd, char *username, char *password)
         if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0)
         {
             send(client_fd, "Login successful\n", 17, 0);
+            add_client(username, client_fd);
             return;
         }
     }
@@ -121,6 +142,93 @@ void handle_client(int client_fd)
     else if (nbytes == 0)
     {
         printf("Client %d disconnected\n", client_fd);
+        remove_client(client_fd);
+        close(client_fd);
+    }
+    else
+    {
+        perror("recv");
+    }
+}
+
+int get_client_fd_by_username(const char *username) {
+    for (int i = 0; i < client_count; i++) {
+        if (strcmp(clients[i].username, username) == 0) {
+            return clients[i].fd;
+        }
+    }
+    return -1;
+}
+
+void handle_message(int client_fd)
+{
+    char buffer[BUFFER_SIZE];
+    int nbytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    if (nbytes > 0)
+    {
+        buffer[nbytes] = '\0';
+        printf("Received message from client %d: %s\n", client_fd, buffer);
+
+        char command[50], arg1[50], arg2[50], arg3[50];
+        int arg4;
+
+        if (sscanf(buffer, "%s %s %s %d %s", command, arg1, arg2, &arg4, arg3) >= 1)
+        {
+            if (strcmp(command, "message") == 0)
+            {
+                if (arg4 == 0)
+                {
+                    for (int i = 0; i < group_count; i++)
+                    {
+                        for (int j = 0; j < groups[i].member_count; j++)
+                        {
+                            if (strcmp(groups[i].members[j], arg1) == 0)
+                            {
+                                for (int k = j; k < groups[i].member_count - 1; k++)
+                                {
+                                    strcpy(groups[i].members[k], groups[i].members[k + 1]);
+                                }
+                                groups[i].member_count--;
+                                return;
+                            }
+                        }
+                    }
+                }
+                else if (arg4 == 1)
+                {
+                    for (int i = 0; i < group_count; i++)
+                    {
+                        for (int j = 0; j < groups[i].member_count; j++)
+                        {
+                            if (strcmp(groups[i].members[j], arg1) == 0)
+                            {
+                                for (int k = 0; k < groups[i].member_count; k++)
+                                {
+                                    if (strcmp(groups[i].members[k], arg1) != 0)
+                                    {
+                                        int member_fd = get_client_fd_by_username(groups[i].members[k]);
+                                        if (member_fd != -1)
+                                        {
+                                            send(member_fd, arg3, strlen(arg3), 0);
+                                        }
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            send(client_fd, "Invalid command format\n", 23, 0);
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Client %d disconnected\n", client_fd);
+        remove_client(client_fd);
         close(client_fd);
     }
     else
