@@ -3,140 +3,152 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 
-#define SERVER_IP "127.0.0.1" // Adresse IP du serveur
-#define SERVER_PORT 8080      // Port du serveur
-#define BUFFER_SIZE 2048
+#define PORT 8080
+#define BUFFER_SIZE 1024
+#define MAX_USERS 100
 
-int sockfd; // Socket pour la connexion avec le serveur
-char name[50];
-char gender[10];
-int age;
-
-// Fonction pour envoyer des messages au serveur
-void *send_message(void *arg)
+typedef struct
 {
-    char buffer[BUFFER_SIZE];
+    int socket;
+    char username[50];
+} User;
 
-    while (1)
+User users[MAX_USERS];
+int user_count = 0;
+char current_user[50] = ""; // Store the current user's username
+
+void send_command(int sockfd, const char *command)
+{
+    if (send(sockfd, command, strlen(command), 0) == -1)
     {
-        // Lire le message de l'utilisateur
-        fgets(buffer, BUFFER_SIZE, stdin);
-        // Enlever le caractère de nouvelle ligne
-        buffer[strcspn(buffer, "\n")] = '\0';
-
-        // Envoyer le message au serveur
-        if (send(sockfd, buffer, strlen(buffer), 0) < 0)
-        {
-            perror("Erreur lors de l'envoi du message");
-            exit(EXIT_FAILURE);
-        }
-
-        // Vérifier si l'utilisateur veut quitter
-        if (strcmp(buffer, "/quit") == 0)
-        {
-            printf("Déconnexion...\n");
-            close(sockfd);
-            exit(EXIT_SUCCESS);
-        }
+        perror("send");
     }
 
-    return NULL;
+    char buffer[BUFFER_SIZE];
+    int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    if (nbytes > 0)
+    {
+        buffer[nbytes] = '\0';
+        printf("Server response: %s\n", buffer);
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
+    }
 }
 
-// Fonction pour recevoir les messages du serveur
-void *receive_message(void *arg)
+void handle_login_command(int sockfd, const char *command, char *current_user)
 {
-    char buffer[BUFFER_SIZE];
-    int nbytes;
-
-    while (1)
+    // Send login command to the server
+    if (send(sockfd, command, strlen(command), 0) == -1)
     {
-        // Recevoir un message du serveur
-        nbytes = recv(sockfd, buffer, sizeof(buffer), 0);
-        if (nbytes <= 0)
-        {
-            perror("Erreur lors de la réception du message ou connexion fermée");
-            exit(EXIT_FAILURE);
-        }
-
-        buffer[nbytes] = '\0'; // Ajouter un terminateur de chaîne
-        printf("%s\n", buffer);
+        perror("send");
+        return;
     }
 
-    return NULL;
+    // Wait for server response
+    char buffer[BUFFER_SIZE];
+    int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    if (nbytes > 0)
+    {
+        buffer[nbytes] = '\0';
+        printf("Server response: %s\n", buffer);
+        if (strncmp(buffer, "Login successful", 16) == 0)
+        {
+            sscanf(command, "login %s", current_user); // Store the username
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
+    }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+
+    const char *server_ip = "127.0.0.1";
+    int server_port = 8080;
+
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1)
+    {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+
     struct sockaddr_in server_addr;
-    pthread_t send_thread, receive_thread;
-
-    // Créer un socket pour le client
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        perror("Erreur lors de la création du socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Configurer l'adresse du serveur
+    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
-
-    // Connexion au serveur
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    server_addr.sin_port = htons(server_port);
+    if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) <= 0)
     {
-        perror("Erreur lors de la connexion au serveur");
+        perror("inet_pton");
+        close(sockfd);
         exit(EXIT_FAILURE);
     }
 
-    printf("Connecté au serveur\n");
-
-    // Saisie des informations de l'utilisateur
-    printf("Entrez votre nom: ");
-    fgets(name, 50, stdin);
-    name[strcspn(name, "\n")] = '\0'; // Retirer le saut de ligne
-
-    printf("Entrez votre sexe (M/F): ");
-    fgets(gender, 10, stdin);
-    gender[strcspn(gender, "\n")] = '\0'; // Retirer le saut de ligne
-
-    printf("Entrez votre âge: ");
-    scanf("%d", &age);
-    getchar(); // Nettoyer le buffer d'entrée
-
-    // Envoyer les informations de matchmaking au serveur
-    char auth_data[BUFFER_SIZE];
-    sprintf(auth_data, "%s %s %d", name, gender, age);
-    if (send(sockfd, auth_data, strlen(auth_data), 0) < 0)
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
     {
-        perror("Erreur lors de l'envoi des informations de matchmaking");
+        perror("connect");
+        close(sockfd);
         exit(EXIT_FAILURE);
     }
 
-    // Créer un thread pour envoyer des messages
-    if (pthread_create(&send_thread, NULL, send_message, NULL) != 0)
+    char command[BUFFER_SIZE];
+    char current_user[50] = ""; // Store the current user's username
+
+    while (1)
     {
-        perror("Erreur lors de la création du thread d'envoi");
-        exit(EXIT_FAILURE);
+        printf("Available commands:\n");
+        printf("login <username> <password>\n");
+        printf("create_user <username> <age> <Gender (M/F)> <password>\n\n");
+        printf("commands for logged in users:\n");
+        printf("list_groups\n");
+        printf("join_group <group_name>\n\n");
+        printf("Enter command: ");
+        if (fgets(command, sizeof(command), stdin) == NULL)
+        {
+            break;
+        }
+        command[strcspn(command, "\n")] = '\0'; // Remove newline character
+
+        // Check if the command is a login command
+        if (strncmp(command, "login", 5) == 0)
+        {
+            handle_login_command(sockfd, command, current_user);
+        }
+        else if (strncmp(command, "join_group", 10) == 0)
+        {
+            // Automatically append the current user to the join_group command
+            if (strlen(current_user) == 0)
+            {
+                printf("You must be logged in to join a group.\n");
+            }
+            else
+            {
+                char join_command[BUFFER_SIZE];
+                snprintf(join_command, sizeof(join_command), "join_group %s %s", current_user, command + 11);
+                send_command(sockfd, join_command);
+            }
+        }
+        else
+        {
+            send_command(sockfd, command);
+        }
     }
 
-    // Créer un thread pour recevoir des messages
-    if (pthread_create(&receive_thread, NULL, receive_message, NULL) != 0)
-    {
-        perror("Erreur lors de la création du thread de réception");
-        exit(EXIT_FAILURE);
-    }
-
-    // Attendre que les threads se terminent (en théorie, ils tournent à l'infini)
-    pthread_join(send_thread, NULL);
-    pthread_join(receive_thread, NULL);
-
-    // Fermer la connexion au serveur
     close(sockfd);
-
     return 0;
 }
