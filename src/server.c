@@ -10,20 +10,27 @@
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 1024
 
-void add_client(const char *username, int fd) {
-    if (client_count < MAX_CLIENTS) {
+void add_client(const char *username, int fd)
+{
+    if (client_count < MAX_CLIENTS)
+    {
         strncpy(clients[client_count].username, username, sizeof(clients[client_count].username) - 1);
         clients[client_count].fd = fd;
         client_count++;
-    } else {
+    }
+    else
+    {
         printf("Max clients reached, cannot add more clients.\n");
     }
 }
 
-void remove_client(int fd) {
-    for (int i = 0; i < client_count; i++) {
-        if (clients[i].fd == fd) {
-            clients[i] = clients[client_count - 1]; 
+void remove_client(int fd)
+{
+    for (int i = 0; i < client_count; i++)
+    {
+        if (clients[i].fd == fd)
+        {
+            clients[i] = clients[client_count - 1];
             client_count--;
             break;
         }
@@ -151,9 +158,12 @@ void handle_client(int client_fd)
     }
 }
 
-int get_client_fd_by_username(const char *username) {
-    for (int i = 0; i < client_count; i++) {
-        if (strcmp(clients[i].username, username) == 0) {
+int get_client_fd_by_username(const char *username)
+{
+    for (int i = 0; i < client_count; i++)
+    {
+        if (strcmp(clients[i].username, username) == 0)
+        {
             return clients[i].fd;
         }
     }
@@ -193,6 +203,7 @@ void handle_message(int client_fd)
                             }
                         }
                     }
+                    remove_client(client_fd);
                 }
                 else if (arg4 == 1)
                 {
