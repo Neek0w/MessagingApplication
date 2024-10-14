@@ -2,7 +2,7 @@
  * @file database.c
  * @brief Implements the user and group management functions.
  *
- * This file contains the definitions of the functions declared in `database.h`, 
+ * This file contains the definitions of the functions declared in `database.h`,
  * including the logic for adding users and groups, reading from a file, and writing to a file.
  */
 
@@ -14,17 +14,17 @@ int client_count = 0;
 /**
  * @var users
  * @brief Array that stores all the users in the system.
- * 
- * The array `users` stores information about all the registered users. 
+ *
+ * The array `users` stores information about all the registered users.
  * It can contain up to `MAX_USERS` entries.
  */
-User users[MAX_USERS]; 
+User users[MAX_USERS];
 int user_count = 0; /**< The current number of registered users in the system. */
 
 /**
  * @var groups
  * @brief Array that stores all the groups in the system.
- * 
+ *
  * The array `groups` holds the data about each group, including its members.
  * It can contain up to `MAX_GROUPS` entries.
  */
@@ -35,7 +35,7 @@ int group_count = 0; /**< The current number of groups in the system. */
  * @brief Adds a new user to the system.
  *
  * This function checks if the maximum number of users (`MAX_USERS`) has been reached.
- * If not, it adds a new user with the specified username, gender, age, and password 
+ * If not, it adds a new user with the specified username, gender, age, and password
  * to the global `users` array and increments the user count.
  *
  * @param username The username of the new user (maximum length: 50 characters).
@@ -45,7 +45,7 @@ int group_count = 0; /**< The current number of groups in the system. */
  */
 void add_user(const char *username, char gender, int age, const char *password)
 {
-    if (user_count < MAX_USERS) 
+    if (user_count < MAX_USERS)
     {
         strncpy(users[user_count].username, username, sizeof(users[user_count].username) - 1);
         users[user_count].username[sizeof(users[user_count].username) - 1] = '\0'; // Null-termination
@@ -53,7 +53,7 @@ void add_user(const char *username, char gender, int age, const char *password)
         users[user_count].age = age;
         strncpy(users[user_count].password, password, sizeof(users[user_count].password) - 1);
         users[user_count].password[sizeof(users[user_count].password) - 1] = '\0'; // Null-termination
-        user_count++;  // Increment the user count
+        user_count++;                                                              // Increment the user count
     }
     else
     {
@@ -74,18 +74,26 @@ void add_user(const char *username, char gender, int age, const char *password)
  */
 void add_group(const char *group_name, char members[MAX_GROUP_MEMBERS][50], int member_count)
 {
-    if (group_count < MAX_GROUPS) 
+    if (group_count < MAX_GROUPS)
     {
         strncpy(groups[group_count].group_name, group_name, sizeof(groups[group_count].group_name) - 1);
         groups[group_count].group_name[sizeof(groups[group_count].group_name) - 1] = '\0'; // Null-termination
         groups[group_count].member_count = member_count;
-        
-        for (int i = 0; i < member_count; i++) 
+
+        for (int i = 0; i < member_count; i++)
         {
             strncpy(groups[group_count].members[i], members[i], sizeof(groups[group_count].members[i]) - 1);
             groups[group_count].members[i][sizeof(groups[group_count].members[i]) - 1] = '\0'; // Null-termination
         }
-        group_count++;  // Increment the group count
+        group_count++; // Increment the group count
+
+        // Create a folder for the group in ./drive/
+        char folder_path[100];
+        snprintf(folder_path, sizeof(folder_path), "./drive/%s", group_name);
+        if (mkdir(folder_path, 0777) == -1)
+        {
+            perror("mkdir");
+        }
     }
     else
     {
@@ -97,9 +105,9 @@ void add_group(const char *group_name, char members[MAX_GROUP_MEMBERS][50], int 
  * @brief Parses a file and loads users and groups from it.
  *
  * This function opens the specified file and reads the user and group information line by line.
- * Users are expected to be in the format: `username gender age password`. 
+ * Users are expected to be in the format: `username gender age password`.
  * Groups are expected to be in the format: `group group_name member1 member2 ...`.
- * 
+ *
  * @param filename The name of the file to parse.
  */
 void parse_file(const char *filename)
@@ -158,7 +166,7 @@ void parse_file(const char *filename)
  * @brief Writes the current users and groups to a file.
  *
  * This function writes all the users and groups from the system to the specified file.
- * Users are written in the format: `username gender age password`. 
+ * Users are written in the format: `username gender age password`.
  * Groups are written as: `group group_name member1 member2 ...`.
  *
  * @param filename The name of the file to write to.

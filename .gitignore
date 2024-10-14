@@ -28,6 +28,8 @@
 *.so.*
 *.dylib
 
+src/server/drive/*
+
 # Executables
 *.exe
 *.out
@@ -35,8 +37,7 @@
 *.i*86
 *.x86_64
 *.hex
-client
-serveur
+
 
 # Debug files
 *.dSYM/

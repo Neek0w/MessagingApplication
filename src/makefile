@@ -3,23 +3,23 @@ CFLAGS = -Wall -g
 
 all: server client
 
-server: server.o database.o
-	$(CC) $(CFLAGS) -o server.exe server.o database.o -lpthread
+server: server/server.o server/database.o
+	$(CC) $(CFLAGS) -o server/server.exe server/server.o server/database.o -lpthread
 
-client: client.o
-	$(CC) $(CFLAGS) -o client.exe client.o -lpthread
+client: client/client.o
+	$(CC) $(CFLAGS) -o client/client.exe client/client.o -lpthread
 
-server.o: server.c database.h
-	$(CC) $(CFLAGS) -c server.c 
+server/server.o: server/server.c server/database.h
+	$(CC) $(CFLAGS) -c server/server.c -o server/server.o
 
-database.o: database.c
-	$(CC) $(CFLAGS) -c database.c
+server/database.o: server/database.c
+	$(CC) $(CFLAGS) -c server/database.c -o server/database.o
 
-client.o: client.c
-	$(CC) $(CFLAGS) -c client.c
+client/client.o: client/client.c
+	$(CC) $(CFLAGS) -c client/client.c -o client/client.o
 
 clean:
-	rm -f *.o server.exe client.exe
+	rm -f server/*.o client/*.o server/server.exe client/client.exe
 
 redo: clean all
 
