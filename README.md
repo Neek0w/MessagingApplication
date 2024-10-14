@@ -36,6 +36,10 @@ L’objectif de ce projet est de développer une application de matchmaking perm
   - [ ] Menu
   - [ ] /help
 
+- [] Rédaction rapport
+
+- [] Tests unitaire
+
 ## Exigences techniques :
 
 - [x] Gestion et authentification des utilisateurs.
