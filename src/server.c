@@ -150,6 +150,39 @@ void print_data()
     }
 }
 
+void handle_message(int client_fd, char *username, char *group_name, char *message)
+{
+    for (int i = 0; i < group_count; i++)
+    {
+        if (strcmp(groups[i].group_name, group_name) == 0)
+        {
+            for (int j = 0; j < groups[i].member_count; j++)
+            {
+                if (strcmp(groups[i].members[j], username) == 0)
+                {
+                    char buffer[BUFFER_SIZE];
+                    snprintf(buffer, sizeof(buffer), "%s: %s\n", username, message);
+                    for (int k = 0; k < groups[i].member_count; k++)
+                    {
+                        if (strcmp(groups[i].members[k], username) != 0)
+                        {
+                            int member_fd = get_client_fd_by_username(groups[i].members[k]);
+                            if (member_fd != -1)
+                            {
+                                send(member_fd, buffer, strlen(buffer), 0);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+            send(client_fd, "You are not a member of this group\n", 35, 0);
+            return;
+        }
+    }
+    send(client_fd, "Group not found\n", 16, 0);
+}
+
 int main()
 {
     parse_file("data.txt");
