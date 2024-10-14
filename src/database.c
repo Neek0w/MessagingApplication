@@ -8,6 +8,9 @@
 
 #include "database.h"
 
+struct client_info clients[MAX_CLIENTS];
+int client_count = 0;
+
 /**
  * @var users
  * @brief Array that stores all the users in the system.
