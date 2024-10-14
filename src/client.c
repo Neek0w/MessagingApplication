@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -75,29 +76,70 @@ void handle_login_command(int sockfd, char *command)
     }
 }
 
+void *listen_to_server(void *arg)
+{
+    int sockfd = *(int *)arg;
+    char buffer[BUFFER_SIZE];
+    int nbytes;
+
+    while (1)
+    {
+        nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+        if (nbytes > 0)
+        {
+            buffer[nbytes] = '\0';
+            printf("%s\n", buffer);
+        }
+        else if (nbytes == 0)
+        {
+            printf("Server closed the connection\n");
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            perror("recv");
+            break;
+        }
+    }
+
+    return NULL;
+}
+
 void handle_chat(int sockfd, char *command)
 {
-    printf("you are now in : %s", group_name);
+    printf("you are now in : %s\n", group_name);
+
+    pthread_t listen_thread;
+    if (pthread_create(&listen_thread, NULL, listen_to_server, &sockfd) != 0)
+    {
+        perror("pthread_create");
+        exit(EXIT_FAILURE);
+    }
+
     while (1)
     {
         printf("Enter message (type 'exit' to leave group): ");
-        if (fgets(command, BUFFER_SIZE, stdin) == NULL)
-        {
-            break;
-        }
+        fgets(command, BUFFER_SIZE, stdin);
         command[strcspn(command, "\n")] = '\0';
 
         if (strncmp(command, "exit", 4) == 0)
         {
-            printf("Leaving group...\n");
-            is_in_group = 0;
+            char exit_command[BUFFER_SIZE];
+            snprintf(exit_command, sizeof(exit_command), "message %s %s %d %s", group_name, current_user, 0, command);
+            send(sockfd, exit_command, strlen(exit_command), 0);
+            printf("Leaving group %s...\n", group_name);
+            pthread_cancel(listen_thread);
             break;
         }
-
-        if (send(sockfd, command, strlen(command), 0) == -1)
+        else
         {
-            perror("send");
-            break;
+            char message_command[BUFFER_SIZE];
+            snprintf(message_command, sizeof(message_command), "message %s %s %d %s", group_name, current_user, 1, command);
+            if (send(sockfd, message_command, strlen(command), 0) == -1)
+            {
+                perror("send");
+                break;
+            }
         }
 
         char buffer[BUFFER_SIZE];
