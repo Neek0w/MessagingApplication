@@ -105,8 +105,12 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
         return;
     }
 
+    // Notify the client that the server is ready
+    send(client_fd, "SERVER_READY\n", 13, 0);
+
     // Receive the file size from the client
     size_t file_size;
+    printf("\n\nAwaiting for recv ...\n\n");
     if (recv(client_fd, &file_size, sizeof(file_size), 0) <= 0)
     {
         perror("recv");
@@ -115,10 +119,14 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
     }
     printf("File size: %zu bytes\n", file_size);
 
+    // Notify the client that the file size is received and OK
+    send(client_fd, "SIZE_OK\n", 8, 0);
+
     // Receive the file data from the client
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
     size_t total_bytes_received = 0;
+    printf("\n\nAwaiting for recv ...\n\n");
     while (total_bytes_received < file_size && (bytes_received = recv(client_fd, buffer, sizeof(buffer), 0)) > 0)
     {
         fwrite(buffer, 1, bytes_received, file);
@@ -169,7 +177,7 @@ void handle_download_file(int client_fd, const char *group_name, const char *fil
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
     {
-        printf("\n\nBuffer :\n %s", buffer);
+        // printf("\n\nBuffer :\n %s", buffer);
         if (send(client_fd, buffer, bytes_read, 0) == -1)
         {
             perror("send");
@@ -286,7 +294,8 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                         strcpy(groups[i].members[k], groups[i].members[k + 1]);
                     }
                     groups[i].member_count--;
-                    // remove_client(client_fd);
+                    if (client_fd == FIRST_SERVER_FD)
+                        send(client_fd, "Left group successfully\n", 24, 0);
                     return;
                 }
             }
@@ -332,21 +341,35 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
 void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
+    printf("\n\nAwaiting for recv ...\n\n");
     int nbytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
 
     if (nbytes > 0)
     {
         buffer[nbytes] = '\0';
-        printf("Received message from client %d: %s\n", client_fd, buffer);
-
-        if (client_fd != FIRST_SERVER_FD)
+        if (client_fd == FIRST_SERVER_FD)
         {
+            printf("Received message from server: %s\n", buffer);
+        }
+        else
+        {
+            printf("Received message from client %d: %s\n", client_fd, buffer);
+        }
+
+        if (client_fd != FIRST_SERVER_FD &&
+            !(strncmp(buffer, "upload_file", 11) == 0 ||
+              strncmp(buffer, "download_file", 13) == 0 ||
+              strncmp(buffer, "list_files", 10) == 0))
+        {
+
+            printf("sending command to server\n");
             if (send(FIRST_SERVER_FD, buffer, nbytes, 0) == -1)
             {
                 perror("send to first server");
             }
 
             char response[BUFFER_SIZE];
+            printf("\n\nAwaiting for recv ...\n\n");
             int response_bytes = recv(FIRST_SERVER_FD, response, sizeof(response) - 1, 0);
             if (response_bytes > 0)
             {
@@ -392,6 +415,13 @@ void handle_client(int client_fd)
             else if (strcmp(command, "upload_file") == 0)
             {
                 handle_upload_file(client_fd, arg1, arg2); // arg1 is group name, arg2 is file name
+                if (client_fd != FIRST_SERVER_FD)
+                {
+                    char transfer_command[BUFFER_SIZE];
+                    snprintf(transfer_command, sizeof(transfer_command), "transfer_file %s %s\n", arg1, arg2);
+                    send(FIRST_SERVER_FD, transfer_command, strlen(transfer_command), 0);
+                    handle_download_file(FIRST_SERVER_FD, arg1, arg2);
+                }
             }
             else if (strcmp(command, "list_files") == 0)
             {
@@ -399,16 +429,23 @@ void handle_client(int client_fd)
             }
             else if (strcmp(command, "download_file") == 0)
             {
-                handle_download_file(client_fd, arg1, arg2); // arg1 is file name
+                handle_download_file(client_fd, arg1, arg2);
+            }
+            else if (client_fd == FIRST_SERVER_FD && strcmp(command, "transfer_file") == 0)
+            {
+                printf("Recieving file from other server\n");
+                handle_upload_file(FIRST_SERVER_FD, arg1, arg2);
             }
             else
             {
-                send(client_fd, "Unknown command\n", 16, 0);
+                if (client_fd != FIRST_SERVER_FD)
+                    send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
-            send(client_fd, "Invalid command format\n", 23, 0);
+            if (client_fd != FIRST_SERVER_FD)
+                send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
     else if (nbytes == 0)

@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <libgen.h>
+#include <poll.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
@@ -95,9 +96,36 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     // Send the command to the server
     char command[BUFFER_SIZE];
     snprintf(command, sizeof(command), "upload_file %s %s", group_name, file_name);
+    printf("sending command: %s\n", command);
     if (send(sockfd, command, strlen(command), 0) == -1)
     {
         perror("send");
+        fclose(file);
+        return;
+    }
+
+    // Receive confirmation from the server
+    char server_ready[BUFFER_SIZE];
+    int nbytes = recv(sockfd, server_ready, sizeof(server_ready) - 1, 0);
+    if (nbytes > 0)
+    {
+        server_ready[nbytes] = '\0';
+        if (strncmp(server_ready, "SERVER_READY", 12) != 0)
+        {
+            printf("Server is not ready for file upload. Aborting upload.\n");
+            fclose(file);
+            return;
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
         fclose(file);
         return;
     }
@@ -106,11 +134,38 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
+    printf("File size: %ld bytes\n", file_size);
 
     // Send the file size to the server
     if (send(sockfd, &file_size, sizeof(file_size), 0) == -1)
     {
         perror("send");
+        fclose(file);
+        return;
+    }
+
+    // Receive confirmation of file size from the server
+    char size_ok[BUFFER_SIZE];
+    nbytes = recv(sockfd, size_ok, sizeof(size_ok) - 1, 0);
+    if (nbytes > 0)
+    {
+        size_ok[nbytes] = '\0';
+        if (strncmp(size_ok, "SIZE_OK", 7) != 0)
+        {
+            printf("Server did not acknowledge file size. Aborting upload.\n");
+            fclose(file);
+            return;
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
         fclose(file);
         return;
     }
@@ -138,7 +193,9 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
 
 void download_file(int sockfd, const char *group_name, const char *file_name)
 {
-    // Prepare the download command
+    printf("Downloading file %s from group %s...\n", file_name, group_name);
+
+    // Préparer la commande de téléchargement
     char download_command[BUFFER_SIZE];
     snprintf(download_command, sizeof(download_command), "download_file %s %s", group_name, file_name);
     if (send(sockfd, download_command, strlen(download_command), 0) == -1)
@@ -146,90 +203,67 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         perror("send");
         return;
     }
+    printf("Command sent for downloading file.\n");
 
-    // Open the file for writing
+    // Ouvrir le fichier pour écriture
     FILE *file = fopen(file_name, "wb");
     if (file == NULL)
     {
         perror("fopen");
         return;
     }
+    printf("File opened for writing: %s\n", file_name);
 
-    // Receive the file size from the server
+    // Recevoir la taille du fichier du serveur
     uint64_t file_size;
     if (recv(sockfd, &file_size, sizeof(file_size), 0) <= 0)
     {
-        perror("recv");
+        perror("recv (file size)");
         fclose(file);
         return;
     }
+    printf("File size: %ld bytes\n", file_size);
 
-    // Receive the file data from the server
+    // Recevoir les données du fichier
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
     uint64_t total_bytes_received = 0;
-    while (total_bytes_received < file_size && (bytes_received = recv(sockfd, buffer, sizeof(buffer), 0)) > 0)
+    while (total_bytes_received < file_size)
     {
-        // Write the received data to the file
+        bytes_received = recv(sockfd, buffer, sizeof(buffer), 0);
+        if (bytes_received <= 0)
+        {
+            perror("recv (file data)");
+            break;
+        }
+
+        // Écrire les données reçues dans le fichier
         size_t bytes_written = fwrite(buffer, 1, bytes_received, file);
         if (bytes_written != bytes_received)
         {
             perror("fwrite");
-            fclose(file);
-            return;
+            break;
         }
+
         total_bytes_received += bytes_received;
+        printf("Progress: %ld/%ld bytes downloaded\n", total_bytes_received, file_size);
     }
 
-    if (bytes_received < 0)
+    if (total_bytes_received == file_size)
     {
-        perror("recv");
+        printf("File downloaded successfully: %s\n", file_name);
+    }
+    else
+    {
+        printf("File download incomplete. Received %ld of %ld bytes.\n", total_bytes_received, file_size);
     }
 
     fclose(file);
-    printf("File downloaded and saved as %s\n", file_name);
-}
-
-void *listen_to_server(void *arg)
-{
-    int sockfd = *(int *)arg;
-    char buffer[BUFFER_SIZE];
-    int nbytes;
-
-    while (1)
-    {
-        nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-        if (nbytes > 0)
-        {
-            buffer[nbytes] = '\0';
-            printf("%s\n", buffer);
-        }
-        else if (nbytes == 0)
-        {
-            printf("Server closed the connection\n");
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
-            perror("recv");
-            break;
-        }
-    }
-
-    return NULL;
 }
 
 void handle_chat(int sockfd, char *command)
 {
-
     printf("you are now in : %s\n", group_name);
-
-    pthread_t listen_thread;
-    if (pthread_create(&listen_thread, NULL, listen_to_server, &sockfd) != 0)
-    {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
-    }
 
     printf("--------------------\nAvailable commands:\n");
     printf("<message> to send a message\n");
@@ -238,39 +272,24 @@ void handle_chat(int sockfd, char *command)
     printf("list_files to list available files in group\n");
     printf("--------------------\n");
 
+    struct pollfd fds[2];
+    fds[0].fd = sockfd;
+    fds[0].events = POLLIN;
+    fds[1].fd = STDIN_FILENO;
+    fds[1].events = POLLIN;
+
     while (1)
     {
-
-        fgets(command, BUFFER_SIZE, stdin);
-        command[strcspn(command, "\n")] = '\0';
-
-        if (strncmp(command, "exit", 4) == 0)
+        int ret = poll(fds, 2, -1);
+        if (ret == -1)
         {
-            char exit_command[BUFFER_SIZE];
-            snprintf(exit_command, sizeof(exit_command), "message %s %s %d %s", group_name, current_user, 0, command);
-            send(sockfd, exit_command, strlen(exit_command), 0);
-            printf("Leaving group %s...\n", group_name);
-            break;
+            perror("poll");
+            exit(EXIT_FAILURE);
         }
-        else if (strncmp(command, "upload_file", 11) == 0)
-        {
-            char file_path[BUFFER_SIZE];
-            sscanf(command + 12, "%s", file_path); // Extract file path from command
-            upload_file(sockfd, group_name, file_path);
-        }
-        else if (strncmp(command, "download_file", 13) == 0)
-        {
-            char file_name[BUFFER_SIZE];
-            sscanf(command + 14, "%s", file_name); // Extract file name from command
-            download_file(sockfd, group_name, file_name);
-        }
-        else if (strncmp(command, "list_files", 10) == 0)
-        {
-            char list_files_command[BUFFER_SIZE];
-            snprintf(list_files_command, sizeof(list_files_command), "list_files %s", group_name);
-            send(sockfd, list_files_command, strlen(list_files_command), 0);
 
-            // Receive and print response
+        if (fds[0].revents & POLLIN)
+        {
+            // Handle incoming message from server
             char buffer[BUFFER_SIZE];
             int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
             if (nbytes > 0)
@@ -288,14 +307,68 @@ void handle_chat(int sockfd, char *command)
                 perror("recv");
             }
         }
-        else
+
+        if (fds[1].revents & POLLIN)
         {
-            char message_command[BUFFER_SIZE];
-            snprintf(message_command, sizeof(message_command), "message %s %s %d %s", group_name, current_user, 1, command);
-            if (send(sockfd, message_command, strlen(message_command), 0) == -1)
+            // Handle user input
+            fgets(command, BUFFER_SIZE, stdin);
+            command[strcspn(command, "\n")] = '\0';
+
+            if (strncmp(command, "exit", 4) == 0)
             {
-                perror("send");
+                char exit_command[BUFFER_SIZE];
+                snprintf(exit_command, sizeof(exit_command), "message %s %s %d %s", group_name, current_user, 0, command);
+                send(sockfd, exit_command, strlen(exit_command), 0);
+                printf("Leaving group %s...\n", group_name);
                 break;
+            }
+            else if (strncmp(command, "upload_file", 11) == 0)
+            {
+                char file_path[BUFFER_SIZE];
+                sscanf(command + 12, "%s", file_path);
+
+                upload_file(sockfd, group_name, file_path);
+            }
+            else if (strncmp(command, "download_file", 13) == 0)
+            {
+                char file_name[BUFFER_SIZE];
+                sscanf(command + 14, "%s", file_name); // Extract file name from command
+
+                download_file(sockfd, group_name, file_name);
+            }
+            else if (strncmp(command, "list_files", 10) == 0)
+            {
+                char list_files_command[BUFFER_SIZE];
+                snprintf(list_files_command, sizeof(list_files_command), "list_files %s", group_name);
+                send(sockfd, list_files_command, strlen(list_files_command), 0);
+
+                // Receive and print response
+                char buffer[BUFFER_SIZE];
+                int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+                if (nbytes > 0)
+                {
+                    buffer[nbytes] = '\0';
+                    printf("%s\n", buffer);
+                }
+                else if (nbytes == 0)
+                {
+                    printf("Server closed the connection\n");
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    perror("recv");
+                }
+            }
+            else
+            {
+                char message_command[BUFFER_SIZE];
+                snprintf(message_command, sizeof(message_command), "message %s %s %d %s", group_name, current_user, 1, command);
+                if (send(sockfd, message_command, strlen(message_command), 0) == -1)
+                {
+                    perror("send");
+                    break;
+                }
             }
         }
     }

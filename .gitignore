@@ -29,6 +29,7 @@
 *.dylib
 
 src/server/drive/*
+src/server2/drive/*
 
 # Executables
 *.exe
