@@ -13,6 +13,8 @@
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
 
+#define FIRST_SERVER_FD 4
+
 void add_client(const char *username, int fd)
 {
     if (client_count < MAX_CLIENTS)
@@ -49,7 +51,8 @@ void handle_login(int client_fd, char *username, char *password)
         if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0)
         {
             send(client_fd, "Login successful\n", 17, 0);
-            add_client(username, client_fd);
+            if (client_fd != FIRST_SERVER_FD)
+                add_client(username, client_fd);
             return;
         }
     }
@@ -311,6 +314,9 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                             }
                         }
                     }
+
+                    if (client_fd == FIRST_SERVER_FD)
+                        send(client_fd, "Message sent successfully\n", 26, 0);
                     return;
                 }
             }
@@ -327,10 +333,35 @@ void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     int nbytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
     if (nbytes > 0)
     {
         buffer[nbytes] = '\0';
         printf("Received message from client %d: %s\n", client_fd, buffer);
+
+        if (client_fd != FIRST_SERVER_FD)
+        {
+            if (send(FIRST_SERVER_FD, buffer, nbytes, 0) == -1)
+            {
+                perror("send to first server");
+            }
+
+            char response[BUFFER_SIZE];
+            int response_bytes = recv(FIRST_SERVER_FD, response, sizeof(response) - 1, 0);
+            if (response_bytes > 0)
+            {
+                response[response_bytes] = '\0';
+                printf("Received response from first server: %s\n", response);
+            }
+            else if (response_bytes == 0)
+            {
+                printf("First server disconnected\n");
+            }
+            else
+            {
+                perror("recv from first server");
+            }
+        }
 
         char command[50], arg1[50], arg2[50];
         char arg3[BUFFER_SIZE];
@@ -410,6 +441,11 @@ void print_data()
             printf("%s ", groups[i].members[j]);
         }
         printf("\n");
+    }
+    printf("\nClients:\n");
+    for (int i = 0; i < client_count; i++)
+    {
+        printf("Username: %s, FD: %d\n", clients[i].username, clients[i].fd);
     }
 }
 

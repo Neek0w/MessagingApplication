@@ -75,3 +75,5 @@ latex/
 *.ist
 *.fls
 *.fdb_latexmk
+
+.vscode/

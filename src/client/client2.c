@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <libgen.h>
 
-#define PORT 8080
+#define PORT 8081
 #define BUFFER_SIZE 8192
 
 typedef struct

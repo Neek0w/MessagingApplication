@@ -14,6 +14,7 @@
 #define SECOND_SERVER_IP "127.0.0.1"
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
+#define SECOND_SERVER_FD 4
 
 void add_client(const char *username, int fd)
 {
@@ -51,7 +52,8 @@ void handle_login(int client_fd, char *username, char *password)
         if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0)
         {
             send(client_fd, "Login successful\n", 17, 0);
-            add_client(username, client_fd);
+            if (client_fd != SECOND_SERVER_FD)
+                add_client(username, client_fd);
             return;
         }
     }
@@ -314,6 +316,8 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                             }
                         }
                     }
+                    if (client_fd == SECOND_SERVER_FD)
+                        send(client_fd, "Message sent successfully\n", 26, 0);
                     return;
                 }
             }
@@ -335,27 +339,30 @@ void handle_client(int client_fd, int second_server_fd)
         buffer[nbytes] = '\0';
         printf("Received message from client %d: %s\n", client_fd, buffer);
 
-        // Forward the command to the second server
-        if (send(second_server_fd, buffer, nbytes, 0) == -1)
+        if (client_fd != SECOND_SERVER_FD)
         {
-            perror("send to second server");
-        }
+            // Forward the command to the second server
+            if (send(second_server_fd, buffer, nbytes, 0) == -1)
+            {
+                perror("send to second server");
+            }
 
-        // Receive response from the second server
-        char response[BUFFER_SIZE];
-        int response_bytes = recv(second_server_fd, response, sizeof(response) - 1, 0);
-        if (response_bytes > 0)
-        {
-            response[response_bytes] = '\0';
-            printf("Received response from second server: %s\n", response);
-        }
-        else if (response_bytes == 0)
-        {
-            printf("Second server disconnected\n");
-        }
-        else
-        {
-            perror("recv from second server");
+            // Receive response from the second server
+            char response[BUFFER_SIZE];
+            int response_bytes = recv(second_server_fd, response, sizeof(response) - 1, 0);
+            if (response_bytes > 0)
+            {
+                response[response_bytes] = '\0';
+                printf("Received response from second server: %s\n", response);
+            }
+            else if (response_bytes == 0)
+            {
+                printf("Second server disconnected\n");
+            }
+            else
+            {
+                perror("recv from second server");
+            }
         }
 
         char command[50], arg1[50], arg2[50];
@@ -436,6 +443,12 @@ void print_data()
             printf("%s ", groups[i].members[j]);
         }
         printf("\n");
+    }
+
+    printf("\nClients:\n");
+    for (int i = 0; i < client_count; i++)
+    {
+        printf("Username: %s, FD: %d\n", clients[i].username, clients[i].fd);
     }
 }
 
