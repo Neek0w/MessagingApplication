@@ -1,7 +1,16 @@
 CC = gcc
 CFLAGS = -Wall -g
 
-all: server client
+all: server client server2
+
+server2: server2/server.o server2/database.o
+	$(CC) $(CFLAGS) -o server2/server.exe server2/server.o server2/database.o -lpthread
+
+server2/server.o: server2/server.c server2/database.h
+	$(CC) $(CFLAGS) -c server2/server.c -o server2/server.o
+
+server2/database.o: server2/database.c	
+	$(CC) $(CFLAGS) -c server2/database.c -o server2/database.o
 
 server: server/server.o server/database.o
 	$(CC) $(CFLAGS) -o server/server.exe server/server.o server/database.o -lpthread

@@ -9,9 +9,7 @@
 #include <sys/stat.h>
 #include "database.h"
 
-#define PORT 8080
-#define SECOND_SERVER_PORT 8081
-#define SECOND_SERVER_IP "127.0.0.1"
+#define PORT 8081
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
 
@@ -272,7 +270,6 @@ int get_client_fd_by_username(const char *username)
 
 void handle_message(int client_fd, char *group, char *user, char *message, int type)
 {
-
     if (type == 0)
     {
         for (int i = 0; i < group_count; i++)
@@ -326,7 +323,7 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
     }
 }
 
-void handle_client(int client_fd, int second_server_fd)
+void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     int nbytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
@@ -334,29 +331,6 @@ void handle_client(int client_fd, int second_server_fd)
     {
         buffer[nbytes] = '\0';
         printf("Received message from client %d: %s\n", client_fd, buffer);
-
-        // Forward the command to the second server
-        if (send(second_server_fd, buffer, nbytes, 0) == -1)
-        {
-            perror("send to second server");
-        }
-
-        // Receive response from the second server
-        char response[BUFFER_SIZE];
-        int response_bytes = recv(second_server_fd, response, sizeof(response) - 1, 0);
-        if (response_bytes > 0)
-        {
-            response[response_bytes] = '\0';
-            printf("Received response from second server: %s\n", response);
-        }
-        else if (response_bytes == 0)
-        {
-            printf("Second server disconnected\n");
-        }
-        else
-        {
-            perror("recv from second server");
-        }
 
         char command[50], arg1[50], arg2[50];
         char arg3[BUFFER_SIZE];
@@ -473,36 +447,12 @@ int main()
     }
 
     struct pollfd fds[MAX_CLIENTS];
-    int nfds = 2;
+    int nfds = 1;
 
     fds[0].fd = server_fd;
     fds[0].events = POLLIN;
 
-    // Initialize the second fd to connect to another server
-    int second_server_fd;
-    struct sockaddr_in second_server_address;
-
-    if ((second_server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
-    {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-
-    second_server_address.sin_family = AF_INET;
-    second_server_address.sin_addr.s_addr = inet_addr(SECOND_SERVER_IP); // Replace with the actual IP address
-    second_server_address.sin_port = htons(SECOND_SERVER_PORT);          // Replace with the actual port
-
-    if (connect(second_server_fd, (struct sockaddr *)&second_server_address, sizeof(second_server_address)) < 0)
-    {
-        perror("connect failed");
-        close(second_server_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    fds[1].fd = second_server_fd;
-    fds[1].events = POLLIN;
-
-    for (int i = 2; i < MAX_CLIENTS; i++)
+    for (int i = 1; i < MAX_CLIENTS; i++)
     {
         fds[i].fd = -1;
     }
@@ -547,7 +497,7 @@ int main()
         {
             if (fds[i].fd != -1 && fds[i].revents & POLLIN)
             {
-                handle_client(fds[i].fd, second_server_fd);
+                handle_client(fds[i].fd);
                 print_data();
             }
         }
