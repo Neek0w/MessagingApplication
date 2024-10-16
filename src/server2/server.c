@@ -50,12 +50,14 @@ void handle_login(int client_fd, char *username, char *password)
     {
         if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0)
         {
+
             send(client_fd, "Login successful\n", 17, 0);
             if (client_fd != FIRST_SERVER_FD)
                 add_client(username, client_fd);
             return;
         }
     }
+
     send(client_fd, "Login failed\n", 13, 0);
 }
 
@@ -65,16 +67,19 @@ void handle_create_user(int client_fd, char *username, char *gender, int age, ch
     {
         if (strcmp(users[i].username, username) == 0)
         {
+
             send(client_fd, "Username already exists\n", 24, 0);
             return;
         }
     }
     add_user(username, gender[0], age, password);
+
     send(client_fd, "User created successfully\n", 26, 0);
 }
-
 void handle_upload_file(int client_fd, const char *group_name, const char *file_name)
 {
+    printf("uploading file... \n");
+
     // Find the group
     int group_index = -1;
     for (int i = 0; i < group_count; i++)
@@ -109,15 +114,14 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
     send(client_fd, "SERVER_READY\n", 13, 0);
 
     // Receive the file size from the client
-    size_t file_size;
-    printf("\n\nAwaiting for recv ...\n\n");
+    uint64_t file_size;
     if (recv(client_fd, &file_size, sizeof(file_size), 0) <= 0)
     {
-        perror("recv");
+        perror("recv (file size)");
         fclose(file);
         return;
     }
-    printf("File size: %zu bytes\n", file_size);
+    printf("File size: %lu bytes\n", file_size);
 
     // Notify the client that the file size is received and OK
     send(client_fd, "SIZE_OK\n", 8, 0);
@@ -125,22 +129,23 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
     // Receive the file data from the client
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
-    size_t total_bytes_received = 0;
-    printf("\n\nAwaiting for recv ...\n\n");
+    uint64_t total_bytes_received = 0;
     while (total_bytes_received < file_size && (bytes_received = recv(client_fd, buffer, sizeof(buffer), 0)) > 0)
     {
         fwrite(buffer, 1, bytes_received, file);
         total_bytes_received += bytes_received;
     }
 
-    if (bytes_received < 0)
+    if (total_bytes_received == file_size)
     {
-        perror("recv");
+        printf("File received successfully: %s\n", file_path);
+    }
+    else
+    {
+        printf("File receive incomplete. Received %lu of %lu bytes.\n", total_bytes_received, file_size);
     }
 
     fclose(file);
-    printf("File received and saved to %s\n", file_path);
-    send(client_fd, "File uploaded successfully\n", 27, 0);
 }
 
 void handle_download_file(int client_fd, const char *group_name, const char *file_name)
@@ -162,38 +167,30 @@ void handle_download_file(int client_fd, const char *group_name, const char *fil
     fseek(file, 0, SEEK_END);
     uint64_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
-    printf("File size: %zu bytes\n", file_size);
 
     // Send the file size to the client
     if (send(client_fd, &file_size, sizeof(file_size), 0) == -1)
     {
-        perror("send");
+        perror("send (file size)");
         fclose(file);
         return;
     }
 
-    // Read the file and send its contents to the client
+    // Send the file data to the client
     char buffer[BUFFER_SIZE];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
     {
-        // printf("\n\nBuffer :\n %s", buffer);
         if (send(client_fd, buffer, bytes_read, 0) == -1)
         {
-            perror("send");
+            perror("send (file data)");
             break;
         }
-    }
-
-    if (ferror(file))
-    {
-        perror("fread");
     }
 
     fclose(file);
     printf("File sent successfully\n");
 }
-
 void handle_list_files(int client_fd, const char *group_name)
 {
     char folder_path[BUFFER_SIZE];
@@ -281,6 +278,7 @@ int get_client_fd_by_username(const char *username)
 
 void handle_message(int client_fd, char *group, char *user, char *message, int type)
 {
+
     if (type == 0)
     {
         for (int i = 0; i < group_count; i++)
@@ -323,7 +321,6 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                             }
                         }
                     }
-
                     if (client_fd == FIRST_SERVER_FD)
                         send(client_fd, "Message sent successfully\n", 26, 0);
                     return;
@@ -342,11 +339,11 @@ void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     printf("\n\nAwaiting for recv ...\n\n");
-    int nbytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-
+    int nbytes = recv(client_fd, buffer, sizeof(buffer), 0);
     if (nbytes > 0)
     {
         buffer[nbytes] = '\0';
+
         if (client_fd == FIRST_SERVER_FD)
         {
             printf("Received message from server: %s\n", buffer);
@@ -359,30 +356,34 @@ void handle_client(int client_fd)
         if (client_fd != FIRST_SERVER_FD &&
             !(strncmp(buffer, "upload_file", 11) == 0 ||
               strncmp(buffer, "download_file", 13) == 0 ||
-              strncmp(buffer, "list_files", 10) == 0))
+              strncmp(buffer, "list_files", 10) == 0 ||
+              strncmp(buffer, "transfer_file", 13 == 0) ||
+              strncmp(buffer, "login", 5) == 0))
         {
-
+            // Forward the command to the second server
             printf("sending command to server\n");
             if (send(FIRST_SERVER_FD, buffer, nbytes, 0) == -1)
             {
-                perror("send to first server");
+                perror("send to second server");
             }
 
+            // Receive response from the second server
             char response[BUFFER_SIZE];
             printf("\n\nAwaiting for recv ...\n\n");
+
             int response_bytes = recv(FIRST_SERVER_FD, response, sizeof(response) - 1, 0);
             if (response_bytes > 0)
             {
                 response[response_bytes] = '\0';
-                printf("Received response from first server: %s\n", response);
+                printf("Received response from second server: %s\n", response);
             }
             else if (response_bytes == 0)
             {
-                printf("First server disconnected\n");
+                printf("Second server disconnected\n");
             }
             else
             {
-                perror("recv from first server");
+                perror("recv from second server");
             }
         }
 
@@ -390,8 +391,9 @@ void handle_client(int client_fd)
         char arg3[BUFFER_SIZE];
         int arg4;
 
-        if (sscanf(buffer, "%s %s %s %d %[^\n]", command, arg1, arg2, &arg4, arg3) >= 1)
+        if (sscanf(buffer, "%49s %49s %49s %d %[^\n]", command, arg1, arg2, &arg4, arg3) >= 1)
         {
+
             if (strcmp(command, "login") == 0)
             {
                 handle_login(client_fd, arg1, arg2);
@@ -414,9 +416,11 @@ void handle_client(int client_fd)
             }
             else if (strcmp(command, "upload_file") == 0)
             {
-                handle_upload_file(client_fd, arg1, arg2); // arg1 is group name, arg2 is file name
+
+                handle_upload_file(client_fd, arg1, arg2);
                 if (client_fd != FIRST_SERVER_FD)
                 {
+                    printf("tranferring file to other server\n");
                     char transfer_command[BUFFER_SIZE];
                     snprintf(transfer_command, sizeof(transfer_command), "transfer_file %s %s\n", arg1, arg2);
                     send(FIRST_SERVER_FD, transfer_command, strlen(transfer_command), 0);
@@ -433,19 +437,18 @@ void handle_client(int client_fd)
             }
             else if (client_fd == FIRST_SERVER_FD && strcmp(command, "transfer_file") == 0)
             {
-                printf("Recieving file from other server\n");
                 handle_upload_file(FIRST_SERVER_FD, arg1, arg2);
             }
             else
             {
-                // if (client_fd != FIRST_SERVER_FD)
+
                 send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
-            if (client_fd != FIRST_SERVER_FD)
-                send(client_fd, "Invalid command format\n", 23, 0);
+
+            send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
     else if (nbytes == 0)
@@ -458,10 +461,12 @@ void handle_client(int client_fd)
     {
         perror("recv");
     }
+    memset(buffer, 0, sizeof(buffer));
 }
 
 void print_data()
 {
+    printf("\n\nServer state\n----------------------------------------------\n");
     printf("Users:\n");
     for (int i = 0; i < user_count; i++)
     {
@@ -479,11 +484,13 @@ void print_data()
         }
         printf("\n");
     }
+
     printf("\nClients:\n");
     for (int i = 0; i < client_count; i++)
     {
         printf("Username: %s, FD: %d\n", clients[i].username, clients[i].fd);
     }
+    printf("---------------------------------------------------");
 }
 
 int main()

@@ -11,7 +11,7 @@
 
 #define PORT 8080
 #define SECOND_SERVER_PORT 8081
-#define SECOND_SERVER_IP "127.0.0.1"
+#define SECOND_SERVER_IP "192.168.18.81"
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
 #define SECOND_SERVER_FD 4
@@ -442,14 +442,14 @@ void handle_client(int client_fd, int second_server_fd)
             }
             else
             {
-                if (client_fd != SECOND_SERVER_FD)
-                    send(client_fd, "Unknown command\n", 16, 0);
+
+                send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
-            if (client_fd != SECOND_SERVER_FD)
-                send(client_fd, "Invalid command format\n", 23, 0);
+
+            send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
     else if (nbytes == 0)
