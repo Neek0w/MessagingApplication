@@ -28,8 +28,6 @@
 *.so.*
 *.dylib
 
-src/server/drive/*
-src/server2/drive/*
 
 # Executables
 *.exe
@@ -78,3 +76,6 @@ latex/
 *.fdb_latexmk
 
 .vscode/
+
+kamikaze/src/region1/server/drive/*
+kamikaze/src/region2/server2/drive/*

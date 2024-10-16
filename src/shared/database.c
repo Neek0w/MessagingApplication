@@ -115,7 +115,7 @@ void parse_file(const char *filename)
     FILE *file = fopen(filename, "r");
     if (!file)
     {
-        perror("Error opening file");
+        perror("Error opening file while parsing");
         exit(EXIT_FAILURE);
     }
 

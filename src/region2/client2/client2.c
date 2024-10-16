@@ -10,13 +10,8 @@
 #include <poll.h>
 
 #define PORT 8081
+#define SERVER_IP "127.0.0.1" // Define server2 IP
 #define BUFFER_SIZE 8192
-
-typedef struct
-{
-    int socket;
-    char username[50];
-} User;
 
 char current_user[50] = "";
 int is_in_group = 0;
@@ -203,8 +198,12 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
     }
     printf("command sent\n");
 
-    // Open the file for writing
-    FILE *file = fopen(file_name, "wb");
+    // Construct the full file path
+    char file_path[BUFFER_SIZE];
+    snprintf(file_path, sizeof(file_path), "./downloads/%s", file_name);
+
+    // Ouvrir le fichier pour écriture
+    FILE *file = fopen(file_path, "wb");
     if (file == NULL)
     {
         perror("fopen");
@@ -453,7 +452,7 @@ void menu(int sockfd, char *command)
 int main(int argc, char *argv[])
 {
 
-    const char *server_ip = "127.0.0.1";
+    const char *server_ip = SERVER_IP;
     int server_port = PORT;
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);

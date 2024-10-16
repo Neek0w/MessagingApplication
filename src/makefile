@@ -1,45 +1,57 @@
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -Ishared
+LDFLAGS = -lpthread
 
 all: server client server2 client2 drive
 
 drive:
-	mkdir -p server/drive/
-	mkdir -p server2/drive/
+	mkdir -p region1/server/drive/
+	mkdir -p region2/server2/drive/
 
-client2: client/client2.o
-	$(CC) $(CFLAGS) -o client/client2.exe client/client2.o -lpthread
+server: region1/server/server.exe
 
-client/client2.o: client/client2.c
-	$(CC) $(CFLAGS) -c client/client2.c -o client/client2.o
+region1/server/server.exe: obj/server.o obj/database.o
+	$(CC) $(CFLAGS) -o region1/server/server.exe obj/server.o obj/database.o
 
-server2: server2/server.o server2/database.o
-	$(CC) $(CFLAGS) -o server2/server.exe server2/server.o server2/database.o -lpthread
+obj/server.o: region1/server/server.c shared/database.h
+	$(CC) $(CFLAGS) -c region1/server/server.c -o obj/server.o
 
-server2/server.o: server2/server.c server2/database.h
-	$(CC) $(CFLAGS) -c server2/server.c -o server2/server.o
 
-server2/database.o: server2/database.c	
-	$(CC) $(CFLAGS) -c server2/database.c -o server2/database.o
+client: region1/client/client.exe
 
-server: server/server.o server/database.o
-	$(CC) $(CFLAGS) -o server/server.exe server/server.o server/database.o -lpthread
+region1/client/client.exe: obj/client.o
+	$(CC) $(CFLAGS) -o region1/client/client.exe obj/client.o $(LDFLAGS)
 
-client: client/client.o
-	$(CC) $(CFLAGS) -o client/client.exe client/client.o -lpthread
+obj/client.o: region1/client/client.c
+	$(CC) $(CFLAGS) -c region1/client/client.c -o obj/client.o
 
-server/server.o: server/server.c server/database.h
-	$(CC) $(CFLAGS) -c server/server.c -o server/server.o
+server2: region2/server2/server2.exe
 
-server/database.o: server/database.c
-	$(CC) $(CFLAGS) -c server/database.c -o server/database.o
+region2/server2/server2.exe: obj/server2.o obj/database.o
+	$(CC) $(CFLAGS) -o region2/server2/server2.exe obj/server2.o obj/database.o $(LDFLAGS)
 
-client/client.o: client/client.c
-	$(CC) $(CFLAGS) -c client/client.c -o client/client.o
+obj/server2.o: region2/server2/server.c shared/database.h
+	$(CC) $(CFLAGS) -c region2/server2/server.c -o obj/server2.o
 
-clean:
-	rm -f server/*.o client/*.o server/server.exe client/client.exe
+obj/database.o: shared/database.c shared/database.h
+	$(CC) $(CFLAGS) -c shared/database.c -o obj/database.o
+
+client2: region2/client2/client2.exe
+
+region2/client2/client2.exe: obj/client2.o
+	$(CC) $(CFLAGS) -o region2/client2/client2.exe obj/client2.o $(LDFLAGS)
+
+obj/client2.o: region2/client2/client2.c
+	$(CC) $(CFLAGS) -c region2/client2/client2.c -o obj/client2.o
+
+clean: clean_files clean_bin
+
+
+
+clean_files:
+	rm -rf region1/server/drive/* region2/server2/drive/* region1/client/downloads/* region2/client2/downloads/*
+
+clean_bin:
+	rm -f obj/*.o  region1/server/server.exe region1/client/client.exe region2/server2/server2.exe region2/client2/client2.exe
 
 redo: clean all
-
-.PHONY: all clean

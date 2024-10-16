@@ -9,12 +9,11 @@
 #include <sys/stat.h>
 #include "database.h"
 
-#define PORT 8080
-#define SECOND_SERVER_PORT 8081
-#define SECOND_SERVER_IP "127.0.0.1" // 192.168.18.81
+#define PORT 8081
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
-#define SECOND_SERVER_FD 4
+
+#define OTHER_SERVER_FD 4
 
 void add_client(const char *username, int fd)
 {
@@ -43,8 +42,6 @@ void remove_client(int fd)
     }
 }
 
-// AUTHENTIFICATION
-
 void handle_login(int client_fd, char *username, char *password)
 {
     for (int i = 0; i < user_count; i++)
@@ -53,7 +50,7 @@ void handle_login(int client_fd, char *username, char *password)
         {
 
             send(client_fd, "Login successful\n", 17, 0);
-            if (client_fd != SECOND_SERVER_FD)
+            if (client_fd != OTHER_SERVER_FD)
                 add_client(username, client_fd);
             return;
         }
@@ -77,6 +74,7 @@ void handle_create_user(int client_fd, char *username, char *gender, int age, ch
 
     send(client_fd, "User created successfully\n", 26, 0);
 }
+
 void handle_upload_file(int client_fd, const char *group_name, const char *file_name)
 {
     printf("uploading file... \n");
@@ -192,6 +190,7 @@ void handle_download_file(int client_fd, const char *group_name, const char *fil
     fclose(file);
     printf("File sent successfully\n");
 }
+
 void handle_list_files(int client_fd, const char *group_name)
 {
     char folder_path[BUFFER_SIZE];
@@ -293,7 +292,7 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                         strcpy(groups[i].members[k], groups[i].members[k + 1]);
                     }
                     groups[i].member_count--;
-                    if (client_fd == SECOND_SERVER_FD)
+                    if (client_fd == OTHER_SERVER_FD)
                         send(client_fd, "Left group successfully\n", 24, 0);
                     return;
                 }
@@ -322,7 +321,7 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                             }
                         }
                     }
-                    if (client_fd == SECOND_SERVER_FD)
+                    if (client_fd == OTHER_SERVER_FD)
                         send(client_fd, "Message sent successfully\n", 26, 0);
                     return;
                 }
@@ -336,7 +335,7 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
     }
 }
 
-void handle_client(int client_fd, int second_server_fd)
+void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     printf("\n\nAwaiting for recv ...\n\n");
@@ -345,7 +344,7 @@ void handle_client(int client_fd, int second_server_fd)
     {
         buffer[nbytes] = '\0';
 
-        if (client_fd == SECOND_SERVER_FD)
+        if (client_fd == OTHER_SERVER_FD)
         {
             printf("Received message from server: %s\n", buffer);
         }
@@ -354,14 +353,14 @@ void handle_client(int client_fd, int second_server_fd)
             printf("Received message from client %d: %s\n", client_fd, buffer);
         }
 
-        if (client_fd != SECOND_SERVER_FD &&
+        if (client_fd != OTHER_SERVER_FD &&
             (strncmp(buffer, "join_group", 10) == 0 ||
              strncmp(buffer, "message", 7) == 0 ||
              strncmp(buffer, "create_user", 11) == 0))
         {
             // Forward the command to the second server
             printf("sending command to server\n");
-            if (send(SECOND_SERVER_FD, buffer, nbytes, 0) == -1)
+            if (send(OTHER_SERVER_FD, buffer, nbytes, 0) == -1)
             {
                 perror("send to second server");
             }
@@ -370,7 +369,7 @@ void handle_client(int client_fd, int second_server_fd)
             char response[BUFFER_SIZE];
             printf("\n\nAwaiting for recv ...\n\n");
 
-            int response_bytes = recv(second_server_fd, response, sizeof(response) - 1, 0);
+            int response_bytes = recv(OTHER_SERVER_FD, response, sizeof(response) - 1, 0);
             if (response_bytes > 0)
             {
                 response[response_bytes] = '\0';
@@ -417,13 +416,13 @@ void handle_client(int client_fd, int second_server_fd)
             {
 
                 handle_upload_file(client_fd, arg1, arg2);
-                if (client_fd != SECOND_SERVER_FD)
+                if (client_fd != OTHER_SERVER_FD)
                 {
                     printf("tranferring file to other server\n");
                     char transfer_command[BUFFER_SIZE];
                     snprintf(transfer_command, sizeof(transfer_command), "transfer_file %s %s\n", arg1, arg2);
-                    send(SECOND_SERVER_FD, transfer_command, strlen(transfer_command), 0);
-                    handle_download_file(SECOND_SERVER_FD, arg1, arg2);
+                    send(OTHER_SERVER_FD, transfer_command, strlen(transfer_command), 0);
+                    handle_download_file(OTHER_SERVER_FD, arg1, arg2);
                 }
             }
             else if (strcmp(command, "list_files") == 0)
@@ -434,21 +433,19 @@ void handle_client(int client_fd, int second_server_fd)
             {
                 handle_download_file(client_fd, arg1, arg2);
             }
-            else if (client_fd == SECOND_SERVER_FD && strcmp(command, "transfer_file") == 0)
+            else if (client_fd == OTHER_SERVER_FD && strcmp(command, "transfer_file") == 0)
             {
-                handle_upload_file(SECOND_SERVER_FD, arg1, arg2);
+                handle_upload_file(OTHER_SERVER_FD, arg1, arg2);
             }
             else
             {
-                if (client_fd != SECOND_SERVER_FD)
-
+                if (client_fd != OTHER_SERVER_FD)
                     send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
-            if (client_fd != SECOND_SERVER_FD)
-
+            if (client_fd != OTHER_SERVER_FD)
                 send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
@@ -491,11 +488,12 @@ void print_data()
     {
         printf("Username: %s, FD: %d\n", clients[i].username, clients[i].fd);
     }
-    printf("---------------------------------------------------");
+    printf("---------------------------------------------------\n");
 }
 
 int main()
 {
+
     parse_file("data.txt");
     print_data();
 
@@ -528,36 +526,12 @@ int main()
     }
 
     struct pollfd fds[MAX_CLIENTS];
-    int nfds = 2;
+    int nfds = 1;
 
     fds[0].fd = server_fd;
     fds[0].events = POLLIN;
 
-    // Initialize the second fd to connect to another server
-    int second_server_fd;
-    struct sockaddr_in second_server_address;
-
-    if ((second_server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
-    {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
-
-    second_server_address.sin_family = AF_INET;
-    second_server_address.sin_addr.s_addr = inet_addr(SECOND_SERVER_IP); // Replace with the actual IP address
-    second_server_address.sin_port = htons(SECOND_SERVER_PORT);          // Replace with the actual port
-
-    if (connect(second_server_fd, (struct sockaddr *)&second_server_address, sizeof(second_server_address)) < 0)
-    {
-        perror("connect failed");
-        close(second_server_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    fds[1].fd = second_server_fd;
-    fds[1].events = POLLIN;
-
-    for (int i = 2; i < MAX_CLIENTS; i++)
+    for (int i = 1; i < MAX_CLIENTS; i++)
     {
         fds[i].fd = -1;
     }
@@ -602,7 +576,7 @@ int main()
         {
             if (fds[i].fd != -1 && fds[i].revents & POLLIN)
             {
-                handle_client(fds[i].fd, second_server_fd);
+                handle_client(fds[i].fd);
                 print_data();
             }
         }
