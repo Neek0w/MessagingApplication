@@ -19,16 +19,23 @@
 #define MAX_GROUPS 50        /**< Maximum number of groups in the system */
 #define MAX_GROUP_MEMBERS 10 /**< Maximum number of members in a group */
 #define MAX_LINE_LENGTH 256  /**< Maximum length of a line in the input file */
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 100      /**< Maximum number of clients that can connect to the server */
 
+
+/**
+ * @struct client_info
+ * @brief Represents information about a client.
+ *
+ * The client_info structure stores information about a client, including their username and file descriptor.
+ */
 struct client_info
 {
     char username[50];
     int fd;
 };
 
-extern struct client_info clients[MAX_CLIENTS];
-extern int client_count;
+extern struct client_info clients[MAX_CLIENTS]; /**< Array storing information about all clients */
+extern int client_count;                        /**< The current count of clients */
 
 /**
  * @struct User
