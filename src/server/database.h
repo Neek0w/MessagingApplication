@@ -19,7 +19,7 @@
 #define MAX_GROUPS 50        /**< Maximum number of groups in the system */
 #define MAX_GROUP_MEMBERS 10 /**< Maximum number of members in a group */
 #define MAX_LINE_LENGTH 256  /**< Maximum length of a line in the input file */
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 100      /**< Maximum number of clients in the system */
 
 struct client_info
 {
