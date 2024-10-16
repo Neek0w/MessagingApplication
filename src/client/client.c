@@ -96,7 +96,6 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     // Send the command to the server
     char command[BUFFER_SIZE];
     snprintf(command, sizeof(command), "upload_file %s %s", group_name, file_name);
-    printf("sending command: %s\n", command);
     if (send(sockfd, command, strlen(command), 0) == -1)
     {
         perror("send");
@@ -134,7 +133,6 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
-    printf("File size: %ld bytes\n", file_size);
 
     // Send the file size to the server
     if (send(sockfd, &file_size, sizeof(file_size), 0) == -1)
@@ -188,7 +186,7 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     }
 
     fclose(file);
-    printf("File sent successfully\n");
+    printf("File uploaded successfully\n");
 }
 
 void download_file(int sockfd, const char *group_name, const char *file_name)
@@ -203,7 +201,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         perror("send");
         return;
     }
-    printf("Command sent for downloading file.\n");
 
     // Ouvrir le fichier pour écriture
     FILE *file = fopen(file_name, "wb");
@@ -212,7 +209,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         perror("fopen");
         return;
     }
-    printf("File opened for writing: %s\n", file_name);
 
     // Recevoir la taille du fichier du serveur
     uint64_t file_size;
@@ -222,7 +218,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         fclose(file);
         return;
     }
-    printf("File size: %ld bytes\n", file_size);
 
     // Recevoir les données du fichier
     char buffer[BUFFER_SIZE];
@@ -263,7 +258,7 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
 
 void handle_chat(int sockfd, char *command)
 {
-    printf("you are now in : %s\n", group_name);
+    printf("\n\n\nyou are now in : %s\n", group_name);
 
     printf("--------------------\nAvailable commands:\n");
     printf("<message> to send a message\n");

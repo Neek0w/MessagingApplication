@@ -438,8 +438,8 @@ void handle_client(int client_fd)
             }
             else
             {
-                if (client_fd != FIRST_SERVER_FD)
-                    send(client_fd, "Unknown command\n", 16, 0);
+                // if (client_fd != FIRST_SERVER_FD)
+                send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
