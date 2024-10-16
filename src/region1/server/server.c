@@ -1,3 +1,33 @@
+/**
+ * @file server.c
+ * @brief This file implements a multi-client server with functionalities for user authentication,
+ *        file uploads/downloads, group management, and message handling between clients.
+ *
+ * The server communicates with a secondary server to ensure data synchronization and load balancing.
+ * Clients can perform various actions such as login, user creation, file management, and joining groups.
+ * Commands received from clients are handled and processed, with some forwarded to the secondary server.
+ *
+ * @details
+ * - User Authentication: Clients can log in or create new accounts.
+ * - Group Management: Clients can create or join groups, list available groups, and exchange messages.
+ * - File Management: Clients can upload or download files to/from specific groups.
+ * - Server Communication: Handles synchronization between the primary and secondary server.
+ * - Handles multiple clients simultaneously using the `poll` mechanism.
+ *
+ * @note This server listens on two ports (one for clients and one for communication with another server).
+ *
+ * @dependencies
+ * - Standard C libraries: `<stdio.h>`, `<stdlib.h>`, `<string.h>`, `<unistd.h>`, `<arpa/inet.h>`,
+ *   `<poll.h>`, `<dirent.h>`, `<sys/types.h>`, `<sys/stat.h>`
+ * - Custom `database.h`: A custom header for user and group data handling.
+ *
+ * @authors
+ * Author Name: LUNET Louis, EGLOFF Nicolas
+ *
+ * @date
+ * 16/10/2024
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +49,17 @@
 #define BUFFER_SIZE 8192
 #define OTHER_SERVER_FD 4
 
+/**
+ * @brief Adds a new client to the server.
+ *
+ * This function adds a new client with a specified username and file descriptor (fd)
+ * to the list of active clients, if the maximum number of clients has not been reached.
+ *
+ * @param username The username of the client.
+ * @param fd The file descriptor associated with the client.
+ *
+ * @note If the maximum number of clients is reached, the client is not added.
+ */
 void add_client(const char *username, int fd)
 {
     if (client_count < MAX_CLIENTS)
@@ -33,6 +74,14 @@ void add_client(const char *username, int fd)
     }
 }
 
+/**
+ * @brief Removes a client from the server.
+ *
+ * This function removes the client with the specified file descriptor (fd)
+ * from the list of active clients.
+ *
+ * @param fd The file descriptor of the client to be removed.
+ */
 void remove_client(int fd)
 {
     for (int i = 0; i < client_count; i++)
@@ -46,6 +95,17 @@ void remove_client(int fd)
     }
 }
 
+/**
+ * @brief Handles the login process for a client.
+ *
+ * Authenticates the client using the provided username and password. If authentication
+ * is successful, the client is added to the active clients list, and a success message
+ * is sent. If authentication fails, an error message is sent to the client.
+ *
+ * @param client_fd The file descriptor of the client attempting to log in.
+ * @param username The username provided by the client.
+ * @param password The password provided by the client.
+ */
 void handle_login(int client_fd, char *username, char *password)
 {
     for (int i = 0; i < user_count; i++)
@@ -62,6 +122,19 @@ void handle_login(int client_fd, char *username, char *password)
     send(client_fd, "Login failed\n", 13, 0);
 }
 
+/**
+ * @brief Creates a new user.
+ *
+ * This function allows a client to create a new user account with the specified
+ * username, gender, age, and password. If the username already exists, an error
+ * message is sent to the client.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param username The desired username for the new account.
+ * @param gender The gender of the new user.
+ * @param age The age of the new user.
+ * @param password The password for the new account.
+ */
 void handle_create_user(int client_fd, char *username, char *gender, int age, char *password)
 {
     for (int i = 0; i < user_count; i++)
@@ -78,6 +151,18 @@ void handle_create_user(int client_fd, char *username, char *gender, int age, ch
     send(client_fd, "User created successfully\n", 26, 0);
 }
 
+/**
+ * @brief Handles the file upload process for a client.
+ *
+ * Receives a file from the client and stores it in the server's group-specific directory.
+ * It verifies the group existence, receives the file size, and writes the data to disk.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param group_name The name of the group the file belongs to.
+ * @param file_name The name of the file being uploaded.
+ *
+ * @note If the group does not exist or any error occurs, the client is notified.
+ */
 void handle_upload_file(int client_fd, const char *group_name, const char *file_name)
 {
     printf("uploading file... \n");
@@ -150,6 +235,18 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
     fclose(file);
 }
 
+/**
+ * @brief Handles the file download process for a client.
+ *
+ * Sends a requested file to the client. The file must be located in the group-specific
+ * directory on the server.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param group_name The name of the group the file belongs to.
+ * @param file_name The name of the file to be downloaded.
+ *
+ * @note If the file cannot be opened, the client is notified.
+ */
 void handle_download_file(int client_fd, const char *group_name, const char *file_name)
 {
     // Create the file path
@@ -194,6 +291,16 @@ void handle_download_file(int client_fd, const char *group_name, const char *fil
     printf("File sent successfully\n");
 }
 
+/**
+ * @brief Lists all files in a group's directory for a client.
+ *
+ * Sends a list of files present in the group's directory to the requesting client.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param group_name The name of the group whose files are to be listed.
+ *
+ * @note If the group folder cannot be opened, the client is notified.
+ */
 void handle_list_files(int client_fd, const char *group_name)
 {
     char folder_path[BUFFER_SIZE];
@@ -226,6 +333,13 @@ void handle_list_files(int client_fd, const char *group_name)
     }
 }
 
+/**
+ * @brief Lists all available groups on the server.
+ *
+ * Sends a list of all groups on the server to the requesting client.
+ *
+ * @param client_fd The file descriptor of the client.
+ */
 void handle_list_groups(int client_fd)
 {
     char buffer[BUFFER_SIZE] = "Groups:\n";
@@ -237,6 +351,18 @@ void handle_list_groups(int client_fd)
     send(client_fd, buffer, strlen(buffer), 0);
 }
 
+/**
+ * @brief Adds a user to a group.
+ *
+ * This function allows a client to join a group. If the user is already a member or the
+ * group is full, an appropriate message is sent to the client.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param username The username of the client attempting to join the group.
+ * @param group_name The name of the group to join.
+ *
+ * @note If the group does not exist, the client is notified.
+ */
 void handle_join_group(int client_fd, char *username, char *group_name)
 {
     for (int i = 0; i < group_count; i++)
@@ -267,6 +393,15 @@ void handle_join_group(int client_fd, char *username, char *group_name)
     send(client_fd, "Group not found\n", 16, 0);
 }
 
+/**
+ * @brief Retrieves the file descriptor of a client by their username.
+ *
+ * Searches through the list of active clients and returns the file descriptor (fd)
+ * associated with the given username.
+ *
+ * @param username The username of the client.
+ * @return int The file descriptor of the client, or -1 if the client is not found.
+ */
 int get_client_fd_by_username(const char *username)
 {
     for (int i = 0; i < client_count; i++)
@@ -279,6 +414,20 @@ int get_client_fd_by_username(const char *username)
     return -1;
 }
 
+/**
+ * @brief Handles messages sent within a group.
+ *
+ * Depending on the message type, this function either removes a user from a group or sends
+ * a message to all group members, excluding the sender.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param group The name of the group.
+ * @param user The username of the client.
+ * @param message The message to be sent (for type 1).
+ * @param type The type of the message (0 for leave group, 1 for send message).
+ *
+ * @note If the client is not part of the group, an error message is sent.
+ */
 void handle_message(int client_fd, char *group, char *user, char *message, int type)
 {
 
@@ -337,6 +486,19 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
         send(client_fd, "Invalid command format\n", 23, 0);
     }
 }
+
+/**
+ * @brief Handles commands from a client.
+ *
+ * This function processes incoming client commands, such as login, user creation,
+ * file upload/download, group joining, and messaging. Some commands may be forwarded
+ * to a secondary server for processing.
+ *
+ * @param client_fd The file descriptor of the client.
+ * @param second_server_fd The file descriptor for the connection to the secondary server.
+ *
+ * @note If a client disconnects, it is removed from the active client list.
+ */
 
 void handle_client(int client_fd)
 {
@@ -467,6 +629,13 @@ void handle_client(int client_fd)
     memset(buffer, 0, sizeof(buffer));
 }
 
+/**
+ * @brief Prints the current server state.
+ *
+ * This function displays the list of users, groups, and active clients on the server.
+ *
+ * @note This is primarily for debugging and monitoring purposes.
+ */
 void print_data()
 {
     printf("\n\nServer state\n----------------------------------------------\n");
@@ -496,6 +665,15 @@ void print_data()
     printf("---------------------------------------------------\n");
 }
 
+/**
+ * @brief Main entry point for the server application.
+ *
+ * Initializes the server, sets up socket connections, and handles incoming client requests
+ * using a polling mechanism. The server also communicates with a secondary server to manage
+ * load balancing and synchronization.
+ *
+ * @return int Returns 0 on successful execution, or exits with an error code.
+ */
 int main()
 {
     parse_file("data.txt");

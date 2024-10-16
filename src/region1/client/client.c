@@ -1,3 +1,11 @@
+/**
+ * @file chat_client.c
+ * @brief A simple chat client with file upload and download functionality.
+ *
+ * This client allows users to log in, join groups, send messages, and upload/download files to/from a server.
+ * It uses TCP sockets for communication with the server.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,10 +20,16 @@
 #define PORT 8080
 #define BUFFER_SIZE 8192
 
-char current_user[50] = "";
-int is_in_group = 0;
-char group_name[50] = "";
+char current_user[50] = ""; /**< Currently logged-in user's name */
+int is_in_group = 0;        /**< Flag indicating if the user is in a group */
+char group_name[50] = "";   /**< Name of the group the user is currently in */
 
+/**
+ * @brief Send a command to the server and receive a response.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param command The command string to send.
+ */
 void send_command(int sockfd, const char *command)
 {
     if (send(sockfd, command, strlen(command), 0) == -1)
@@ -41,6 +55,12 @@ void send_command(int sockfd, const char *command)
     }
 }
 
+/**
+ * @brief Handle the login command by sending login credentials to the server.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param command The login command string.
+ */
 void handle_login_command(int sockfd, char *command)
 {
     // Send login command to the server
@@ -74,9 +94,15 @@ void handle_login_command(int sockfd, char *command)
     }
 }
 
+/**
+ * @brief Upload a file to the server under a specific group.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param group_name The name of the group to upload the file to.
+ * @param file_path The path to the file to upload.
+ */
 void upload_file(int sockfd, const char *group_name, const char *file_path)
 {
-    // Open the file for reading
     FILE *file = fopen(file_path, "rb");
     if (file == NULL)
     {
@@ -84,10 +110,8 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
-    // Extract the file name from the file path
     char *file_name = basename((char *)file_path);
 
-    // Send the command to the server
     char command[BUFFER_SIZE];
     snprintf(command, sizeof(command), "upload_file %s %s", group_name, file_name);
     if (send(sockfd, command, strlen(command), 0) == -1)
@@ -97,7 +121,6 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
-    // Receive confirmation from the server
     char server_ready[BUFFER_SIZE];
     int nbytes = recv(sockfd, server_ready, sizeof(server_ready) - 1, 0);
     if (nbytes > 0)
@@ -123,12 +146,10 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
-    // Get the file size
     fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    // Send the file size to the server
     if (send(sockfd, &file_size, sizeof(file_size), 0) == -1)
     {
         perror("send");
@@ -136,7 +157,6 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
-    // Receive confirmation of file size from the server
     char size_ok[BUFFER_SIZE];
     nbytes = recv(sockfd, size_ok, sizeof(size_ok) - 1, 0);
     if (nbytes > 0)
@@ -162,7 +182,6 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
-    // Read the file and send its contents to the server
     char buffer[BUFFER_SIZE];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
@@ -183,11 +202,17 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
     printf("File uploaded successfully\n");
 }
 
+/**
+ * @brief Download a file from the server.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param group_name The name of the group from which to download the file.
+ * @param file_name The name of the file to download.
+ */
 void download_file(int sockfd, const char *group_name, const char *file_name)
 {
     printf("Downloading file %s from group %s...\n", file_name, group_name);
 
-    // Préparer la commande de téléchargement
     char download_command[BUFFER_SIZE];
     snprintf(download_command, sizeof(download_command), "download_file %s %s", group_name, file_name);
     if (send(sockfd, download_command, strlen(download_command), 0) == -1)
@@ -208,7 +233,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         return;
     }
 
-    // Recevoir la taille du fichier du serveur
     uint64_t file_size;
     if (recv(sockfd, &file_size, sizeof(file_size), 0) <= 0)
     {
@@ -217,7 +241,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         return;
     }
 
-    // Recevoir les données du fichier
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
     uint64_t total_bytes_received = 0;
@@ -230,7 +253,6 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
             break;
         }
 
-        // Écrire les données reçues dans le fichier
         size_t bytes_written = fwrite(buffer, 1, bytes_received, file);
         if (bytes_written != bytes_received)
         {
@@ -254,6 +276,12 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
     fclose(file);
 }
 
+/**
+ * @brief Handle the group chat functionality, allowing message sending and file operations.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param command The command string representing the user's action.
+ */
 void handle_chat(int sockfd, char *command)
 {
     printf("\n\n\nyou are now in : %s\n", group_name);
@@ -282,7 +310,6 @@ void handle_chat(int sockfd, char *command)
 
         if (fds[0].revents & POLLIN)
         {
-            // Handle incoming message from server
             char buffer[BUFFER_SIZE];
             int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
             if (nbytes > 0)
@@ -303,7 +330,6 @@ void handle_chat(int sockfd, char *command)
 
         if (fds[1].revents & POLLIN)
         {
-            // Handle user input
             fgets(command, BUFFER_SIZE, stdin);
             command[strcspn(command, "\n")] = '\0';
 
@@ -325,7 +351,7 @@ void handle_chat(int sockfd, char *command)
             else if (strncmp(command, "download_file", 13) == 0)
             {
                 char file_name[BUFFER_SIZE];
-                sscanf(command + 14, "%s", file_name); // Extract file name from command
+                sscanf(command + 14, "%s", file_name);
 
                 download_file(sockfd, group_name, file_name);
             }
@@ -335,7 +361,6 @@ void handle_chat(int sockfd, char *command)
                 snprintf(list_files_command, sizeof(list_files_command), "list_files %s", group_name);
                 send(sockfd, list_files_command, strlen(list_files_command), 0);
 
-                // Receive and print response
                 char buffer[BUFFER_SIZE];
                 int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
                 if (nbytes > 0)
@@ -367,6 +392,13 @@ void handle_chat(int sockfd, char *command)
     }
 }
 
+/**
+ * @brief Download a file from the server.
+ *
+ * @param sockfd The socket descriptor for the connection.
+ * @param group_name The name of the group from which to download the file.
+ * @param file_name The name of the file to download.
+ */
 void handle_join_command(int sockfd, char *command)
 {
     if (strlen(current_user) == 0)
@@ -410,6 +442,15 @@ void handle_join_command(int sockfd, char *command)
     }
 }
 
+/**
+ * @brief Displays a menu for user interaction and handles commands.
+ *
+ * This function presents a menu of available commands to the user, including login, creating a new user,
+ * listing groups, and joining a group.
+ *
+ * @param sockfd The socket descriptor for the connection to the server.
+ * @param command A buffer to store the user's input commands.
+ */
 void menu(int sockfd, char *command)
 {
     while (1)
@@ -458,6 +499,13 @@ void menu(int sockfd, char *command)
     }
 }
 
+/**
+ * @brief The main function for the chat client program.
+ *
+ * It establishes a connection to the server and provides an interface for the user to log in and interact with groups.
+ *
+ * @return int 0 on success, non-zero on failure.
+ */
 int main(int argc, char *argv[])
 {
 
