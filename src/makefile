@@ -1,7 +1,11 @@
 CC = gcc
 CFLAGS = -Wall -g
 
-all: server client server2 client2
+all: server client server2 client2 drive
+
+drive:
+	mkdir -p server/drive/
+	mkdir -p server2/drive/
 
 client2: client/client2.o
 	$(CC) $(CFLAGS) -o client/client2.exe client/client2.o -lpthread
