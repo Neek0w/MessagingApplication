@@ -11,7 +11,7 @@
 
 #define PORT 8080
 #define SECOND_SERVER_PORT 8081
-#define SECOND_SERVER_IP "192.168.18.81"
+#define SECOND_SERVER_IP "127.0.0.1" // 192.168.18.81
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
 #define SECOND_SERVER_FD 4
@@ -355,11 +355,9 @@ void handle_client(int client_fd, int second_server_fd)
         }
 
         if (client_fd != SECOND_SERVER_FD &&
-            !(strncmp(buffer, "upload_file", 11) == 0 ||
-              strncmp(buffer, "download_file", 13) == 0 ||
-              strncmp(buffer, "list_files", 10) == 0 ||
-              strncmp(buffer, "transfer_file", 13 == 0) ||
-              strncmp(buffer, "login", 5) == 0))
+            (strncmp(buffer, "join_group", 10) == 0 ||
+             strncmp(buffer, "message", 7) == 0 ||
+             strncmp(buffer, "create_user", 11) == 0))
         {
             // Forward the command to the second server
             printf("sending command to server\n");
@@ -442,14 +440,16 @@ void handle_client(int client_fd, int second_server_fd)
             }
             else
             {
+                if (client_fd != SECOND_SERVER_FD)
 
-                send(client_fd, "Unknown command\n", 16, 0);
+                    send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
+            if (client_fd != SECOND_SERVER_FD)
 
-            send(client_fd, "Invalid command format\n", 23, 0);
+                send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
     else if (nbytes == 0)

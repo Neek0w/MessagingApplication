@@ -354,11 +354,9 @@ void handle_client(int client_fd)
         }
 
         if (client_fd != FIRST_SERVER_FD &&
-            !(strncmp(buffer, "upload_file", 11) == 0 ||
-              strncmp(buffer, "download_file", 13) == 0 ||
-              strncmp(buffer, "list_files", 10) == 0 ||
-              strncmp(buffer, "transfer_file", 13 == 0) ||
-              strncmp(buffer, "login", 5) == 0))
+            (strncmp(buffer, "join_group", 10) == 0 ||
+             strncmp(buffer, "message", 7) == 0 ||
+             strncmp(buffer, "create_user", 11) == 0))
         {
             // Forward the command to the second server
             printf("sending command to server\n");
@@ -441,14 +439,14 @@ void handle_client(int client_fd)
             }
             else
             {
-
-                send(client_fd, "Unknown command\n", 16, 0);
+                if (client_fd != FIRST_SERVER_FD)
+                    send(client_fd, "Unknown command\n", 16, 0);
             }
         }
         else
         {
-
-            send(client_fd, "Invalid command format\n", 23, 0);
+            if (client_fd != FIRST_SERVER_FD)
+                send(client_fd, "Invalid command format\n", 23, 0);
         }
     }
     else if (nbytes == 0)
