@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include "database.h"
 #include "server_utils.h"
+#include "socket_utils.h"
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192

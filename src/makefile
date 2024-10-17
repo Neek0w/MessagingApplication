@@ -45,10 +45,10 @@ obj/client2.o: region2/client2/client2.c
 obj/database.o: shared/database.c shared/database.h
 	$(CC) $(CFLAGS) -c shared/database.c -o obj/database.o
 
-obj/server_utils.o: shared/server_utils.c shared/server_utils.h
+obj/server_utils.o: shared/server_utils.c shared/server_utils.h shared/socket_utils.h
 	$(CC) $(CFLAGS) -c shared/server_utils.c -o obj/server_utils.o
 
-obj/client_utils.o: shared/client_utils.c shared/client_utils.h
+obj/client_utils.o: shared/client_utils.c shared/client_utils.h shared/socket_utils.h
 	$(CC) $(CFLAGS) -c shared/client_utils.c -o obj/client_utils.o
 
 clean: clean_files clean_bin

@@ -8,6 +8,8 @@
 #include <libgen.h>
 #include <poll.h>
 #include <stdio.h>
+#include "client_utils.h"
+#include "socket_utils.h"
 
 #define BUFFER_SIZE 8192
 
