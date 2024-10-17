@@ -81,13 +81,13 @@ void handle_login(int client_fd, char *username, char *password)
         if (strcmp(users[i].username, username) == 0 && strcmp(users[i].password, password) == 0)
         {
 
-            send(client_fd, "Login successful\n", 17, 0);
+            send_message(client_fd, "Login successful\n", 17, 0);
             add_client(username, client_fd);
             return;
         }
     }
 
-    send(client_fd, "Login failed\n", 13, 0);
+    send_message(client_fd, "Login failed\n", 13, 0);
 }
 
 /**
@@ -110,13 +110,13 @@ void handle_create_user(int client_fd, char *username, char *gender, int age, ch
         if (strcmp(users[i].username, username) == 0)
         {
 
-            send(client_fd, "Username already exists\n", 24, 0);
+            send_message(client_fd, "Username already exists\n", 24, 0);
             return;
         }
     }
     add_user(username, gender[0], age, password);
 
-    send(client_fd, "User created successfully\n", 26, 0);
+    send_message(client_fd, "User created successfully\n", 26, 0);
 }
 
 /**
@@ -166,7 +166,8 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
     }
 
     // Notify the client that the server is ready
-    send(client_fd, "SERVER_READY\n", 13, 0);
+    send(client_fd, "SERVER_READY", 12, 0);
+    printf("Server ready to receive file\n");
 
     // Receive the file size from the client
     uint64_t file_size;
@@ -176,10 +177,10 @@ void handle_upload_file(int client_fd, const char *group_name, const char *file_
         fclose(file);
         return;
     }
-    printf("File size: %lu bytes\n", file_size);
+    printf("File size received: %lu\n", file_size);
 
     // Notify the client that the file size is received and OK
-    send(client_fd, "SIZE_OK\n", 8, 0);
+    send(client_fd, "SIZE_OK", 7, 0);
 
     // Receive the file data from the client
     char buffer[BUFFER_SIZE];
@@ -230,15 +231,63 @@ void handle_download_file(int client_fd, const char *group_name, const char *fil
         return;
     }
 
-    // Get the file size
+    char server_ready[BUFFER_SIZE];
+    int nbytes = recv(client_fd, server_ready, sizeof(server_ready) - 1, 0);
+    if (nbytes > 0)
+    {
+        server_ready[nbytes] = '\0';
+        if (strncmp(server_ready, "SERVER_READY", 12) != 0)
+        {
+            printf("Server is not ready for file upload. Aborting upload.\n");
+            fclose(file);
+            return;
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
+        fclose(file);
+        return;
+    }
+
     fseek(file, 0, SEEK_END);
-    uint64_t file_size = ftell(file);
+    size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    // Send the file size to the client
     if (send(client_fd, &file_size, sizeof(file_size), 0) == -1)
     {
-        perror("send (file size)");
+        perror("send");
+        fclose(file);
+        return;
+    }
+
+    char size_ok[BUFFER_SIZE];
+    nbytes = recv(client_fd, size_ok, sizeof(size_ok) - 1, 0);
+    if (nbytes > 0)
+    {
+        size_ok[nbytes] = '\0';
+        if (strncmp(size_ok, "SIZE_OK", 7) != 0)
+        {
+            printf("Server did not acknowledge file size. Aborting upload.\n");
+            fclose(file);
+            return;
+        }
+    }
+    else if (nbytes == 0)
+    {
+        printf("Server closed the connection\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        perror("recv");
         fclose(file);
         return;
     }
@@ -278,7 +327,7 @@ void handle_list_files(int client_fd, const char *group_name)
     if (dir == NULL)
     {
         perror("opendir");
-        send(client_fd, "Error opening group folder\n", 27, 0);
+        send_message(client_fd, "Error opening group folder\n", 27, 0);
         return;
     }
 
@@ -295,10 +344,11 @@ void handle_list_files(int client_fd, const char *group_name)
     closedir(dir);
 
     // Send the list of files to the client
-    if (send(client_fd, buffer, strlen(buffer), 0) == -1)
-    {
-        perror("send");
-    }
+    // if (send_message(client_fd, buffer, strlen(buffer), 0) == -1)
+    // {
+    //     perror("send");
+    // }
+    send_message(client_fd, buffer, strlen(buffer), 0);
 }
 
 /**
@@ -316,7 +366,7 @@ void handle_list_groups(int client_fd)
         strcat(buffer, groups[i].group_name);
         strcat(buffer, "\n");
     }
-    send(client_fd, buffer, strlen(buffer), 0);
+    send_message(client_fd, buffer, strlen(buffer), 0);
 }
 
 /**
@@ -341,7 +391,7 @@ void handle_join_group(int client_fd, char *username, char *group_name)
             {
                 if (strcmp(groups[i].members[j], username) == 0)
                 {
-                    send(client_fd, "Already in the group\n", 21, 0);
+                    send_message(client_fd, "Already in the group\n", 21, 0);
                     return;
                 }
             }
@@ -349,16 +399,16 @@ void handle_join_group(int client_fd, char *username, char *group_name)
             {
                 strcpy(groups[i].members[groups[i].member_count], username);
                 groups[i].member_count++;
-                send(client_fd, "Joined group successfully\n", 26, 0);
+                send_message(client_fd, "Joined group successfully\n", 26, 0);
             }
             else
             {
-                send(client_fd, "Group is full\n", 14, 0);
+                send_message(client_fd, "Group is full\n", 14, 0);
             }
             return;
         }
     }
-    send(client_fd, "Group not found\n", 16, 0);
+    send_message(client_fd, "Group not found\n", 16, 0);
 }
 
 /**
@@ -413,7 +463,7 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                     }
                     groups[i].member_count--;
                     if (client_fd == OTHER_SERVER_FD)
-                        send(client_fd, "Left group successfully\n", 24, 0);
+                        send_message(client_fd, "Left group successfully\n", 24, 0);
                     return;
                 }
             }
@@ -435,23 +485,23 @@ void handle_message(int client_fd, char *group, char *user, char *message, int t
                             if (member_fd != -1)
                             {
                                 printf("Sending message to %s\n fd : %d", groups[i].members[k], member_fd);
-                                char send_message[BUFFER_SIZE];
-                                snprintf(send_message, sizeof(send_message), "%s: %s", user, message);
-                                send(member_fd, send_message, strlen(send_message), 0);
+                                char message_to_send[BUFFER_SIZE];
+                                snprintf(message_to_send, sizeof(message_to_send), "%s: %s", user, message);
+                                send_message(member_fd, message_to_send, strlen(message_to_send), 0);
                             }
                         }
                     }
                     if (client_fd == OTHER_SERVER_FD)
-                        send(client_fd, "Message sent successfully\n", 26, 0);
+                        send_message(client_fd, "Message sent successfully\n", 26, 0);
                     return;
                 }
             }
         }
-        send(client_fd, "Invalid command format\n", 23, 0);
+        send_message(client_fd, "Invalid command format\n", 23, 0);
     }
     else
     {
-        send(client_fd, "Invalid command format\n", 23, 0);
+        send_message(client_fd, "Invalid command format\n", 23, 0);
     }
 }
 
@@ -472,129 +522,136 @@ void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     printf("\n\nAwaiting for recv ...\n\n");
-    int nbytes = recv(client_fd, buffer, sizeof(buffer), 0);
-    if (nbytes > 0)
+    // int nbytes = receive_message(client_fd, buffer, sizeof(buffer), 0);
+    // if (nbytes > 0)
+    // {
+    //     buffer[nbytes] = '\0';
+
+    receive_message(client_fd, buffer, sizeof(buffer), 0);
+
+    if (client_fd == OTHER_SERVER_FD)
     {
-        buffer[nbytes] = '\0';
+        printf("Received message from server: %s\n", buffer);
+    }
+    else
+    {
+        printf("Received message from client %d: %s\n", client_fd, buffer);
+    }
 
-        if (client_fd == OTHER_SERVER_FD)
+    if (client_fd != OTHER_SERVER_FD &&
+        (strncmp(buffer, "join_group", 10) == 0 ||
+         strncmp(buffer, "message", 7) == 0 ||
+         strncmp(buffer, "create_user", 11) == 0))
+    {
+        // Forward the command to the second server
+        printf("sending command to server\n");
+        // if (send_message(OTHER_SERVER_FD, buffer, nbytes, 0) == -1)
+        // {
+        //     perror("send to second server");
+        // }
+        send_message(OTHER_SERVER_FD, buffer, strlen(buffer), 0);
+
+        // Receive response from the second server
+        char response[BUFFER_SIZE];
+        printf("\n\nAwaiting for recv ...\n\n");
+
+        // int response_bytes = receive_message(OTHER_SERVER_FD, response, sizeof(response) - 1, 0);
+        // if (response_bytes > 0)
+        // {
+        //     response[response_bytes] = '\0';
+        //     printf("Received response from second server: %s\n", response);
+        // }
+        // else if (response_bytes == 0)
+        // {
+        //     printf("Second server disconnected\n");
+        // }
+        // else
+        // {
+        //     perror("recv from second server");
+        // }
+        receive_message(OTHER_SERVER_FD, response, sizeof(response), 0);
+    }
+
+    char command[50], arg1[50], arg2[50];
+    char arg3[BUFFER_SIZE];
+    int arg4;
+
+    if (sscanf(buffer, "%49s %49s %49s %d %[^\n]", command, arg1, arg2, &arg4, arg3) >= 1)
+    {
+
+        if (strcmp(command, "login") == 0)
         {
-            printf("Received message from server: %s\n", buffer);
+            handle_login(client_fd, arg1, arg2);
         }
-        else
+        else if (strcmp(command, "create_user") == 0)
         {
-            printf("Received message from client %d: %s\n", client_fd, buffer);
+            handle_create_user(client_fd, arg1, arg2, arg4, arg3);
         }
-
-        if (client_fd != OTHER_SERVER_FD &&
-            (strncmp(buffer, "join_group", 10) == 0 ||
-             strncmp(buffer, "message", 7) == 0 ||
-             strncmp(buffer, "create_user", 11) == 0))
+        else if (strcmp(command, "list_groups") == 0)
         {
-            // Forward the command to the second server
-            printf("sending command to server\n");
-            if (send(OTHER_SERVER_FD, buffer, nbytes, 0) == -1)
-            {
-                perror("send to second server");
-            }
+            handle_list_groups(client_fd);
+        }
+        else if (strcmp(command, "join_group") == 0)
+        {
+            handle_join_group(client_fd, arg1, arg2);
+        }
+        else if (strcmp(command, "message") == 0)
+        {
+            handle_message(client_fd, arg1, arg2, arg3, arg4);
+        }
+        else if (strcmp(command, "upload_file") == 0)
+        {
 
-            // Receive response from the second server
-            char response[BUFFER_SIZE];
-            printf("\n\nAwaiting for recv ...\n\n");
+            handle_upload_file(client_fd, arg1, arg2);
+            printf("done uploading file from client\n");
+            if (client_fd != OTHER_SERVER_FD)
+            {
+                printf("tranferring file to other server\n");
+                char transfer_command[BUFFER_SIZE];
+                snprintf(transfer_command, sizeof(transfer_command), "transfer_file %s %s\n", arg1, arg2);
+                send_message(OTHER_SERVER_FD, transfer_command, strlen(transfer_command), 0);
 
-            int response_bytes = recv(OTHER_SERVER_FD, response, sizeof(response) - 1, 0);
-            if (response_bytes > 0)
-            {
-                response[response_bytes] = '\0';
-                printf("Received response from second server: %s\n", response);
-            }
-            else if (response_bytes == 0)
-            {
-                printf("Second server disconnected\n");
-            }
-            else
-            {
-                perror("recv from second server");
+                handle_download_file(OTHER_SERVER_FD, arg1, arg2);
             }
         }
-
-        char command[50], arg1[50], arg2[50];
-        char arg3[BUFFER_SIZE];
-        int arg4;
-
-        if (sscanf(buffer, "%49s %49s %49s %d %[^\n]", command, arg1, arg2, &arg4, arg3) >= 1)
+        else if (strcmp(command, "list_files") == 0)
         {
-
-            if (strcmp(command, "login") == 0)
-            {
-                handle_login(client_fd, arg1, arg2);
-            }
-            else if (strcmp(command, "create_user") == 0)
-            {
-                handle_create_user(client_fd, arg1, arg2, arg4, arg3);
-            }
-            else if (strcmp(command, "list_groups") == 0)
-            {
-                handle_list_groups(client_fd);
-            }
-            else if (strcmp(command, "join_group") == 0)
-            {
-                handle_join_group(client_fd, arg1, arg2);
-            }
-            else if (strcmp(command, "message") == 0)
-            {
-                handle_message(client_fd, arg1, arg2, arg3, arg4);
-            }
-            else if (strcmp(command, "upload_file") == 0)
-            {
-
-                handle_upload_file(client_fd, arg1, arg2);
-                if (client_fd != OTHER_SERVER_FD)
-                {
-                    printf("tranferring file to other server\n");
-                    char transfer_command[BUFFER_SIZE];
-                    snprintf(transfer_command, sizeof(transfer_command), "transfer_file %s %s\n", arg1, arg2);
-                    send(OTHER_SERVER_FD, transfer_command, strlen(transfer_command), 0);
-                    handle_download_file(OTHER_SERVER_FD, arg1, arg2);
-                }
-            }
-            else if (strcmp(command, "list_files") == 0)
-            {
-                handle_list_files(client_fd, arg1); // arg1 is group name
-            }
-            else if (strcmp(command, "download_file") == 0)
-            {
-                handle_download_file(client_fd, arg1, arg2);
-            }
-            else if (client_fd == OTHER_SERVER_FD && strcmp(command, "transfer_file") == 0)
-            {
-                handle_upload_file(OTHER_SERVER_FD, arg1, arg2);
-            }
-            else
-            {
-                if (client_fd != OTHER_SERVER_FD)
-
-                    send(client_fd, "Unknown command\n", 16, 0);
-            }
+            handle_list_files(client_fd, arg1); // arg1 is group name
+        }
+        else if (strcmp(command, "download_file") == 0)
+        {
+            handle_download_file(client_fd, arg1, arg2);
+        }
+        else if (client_fd == OTHER_SERVER_FD && strcmp(command, "transfer_file") == 0)
+        {
+            handle_upload_file(OTHER_SERVER_FD, arg1, arg2);
+            printf("done uploading file from other server\n");
         }
         else
         {
             if (client_fd != OTHER_SERVER_FD)
 
-                send(client_fd, "Invalid command format\n", 23, 0);
+                send_message(client_fd, "Unknown command\n", 16, 0);
         }
-    }
-    else if (nbytes == 0)
-    {
-        printf("Client %d disconnected\n", client_fd);
-        remove_client(client_fd);
-        close(client_fd);
     }
     else
     {
-        perror("recv");
+        if (client_fd != OTHER_SERVER_FD)
+
+            send_message(client_fd, "Invalid command format\n", 23, 0);
     }
-    memset(buffer, 0, sizeof(buffer));
+    // }
+    // else if (nbytes == 0)
+    // {
+    //     printf("Client %d disconnected\n", client_fd);
+    //     remove_client(client_fd);
+    //     close(client_fd);
+    // }
+    // else
+    // {
+    //     perror("recv");
+    // }
+    // memset(buffer, 0, sizeof(buffer));
 }
 
 /**

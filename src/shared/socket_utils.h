@@ -16,5 +16,7 @@ int read_message_from_socket(int fd, char *buffer, int size);
 void write_on_socket(int fd, char *s);
 int read_int_from_socket(int fd);
 void write_int_as_message(int fd, int val);
+void send_message(int fd, char *message, int size, int flag);
+void receive_message(int fd, char *buffer, int size, int flag);
 
 #endif

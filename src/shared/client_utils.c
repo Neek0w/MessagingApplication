@@ -23,29 +23,32 @@ char group_name[50] = "";   /**< Name of the group the user is currently in */
  * @param sockfd The socket descriptor for the connection.
  * @param command The command string to send.
  */
-void send_command(int sockfd, const char *command)
+void send_command(int sockfd, char *command)
 {
-    if (send(sockfd, command, strlen(command), 0) == -1)
-    {
-        perror("send");
-    }
+    // if (send_message(sockfd, command, strlen(command), 0) == -1)
+    // {
+    //     perror("send");
+    // }
+    send_message(sockfd, command, strlen(command), 0);
 
     char buffer[BUFFER_SIZE];
-    int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-    if (nbytes > 0)
-    {
-        buffer[nbytes] = '\0';
-        printf("Server response: %s\n", buffer);
-    }
-    else if (nbytes == 0)
-    {
-        printf("Server closed the connection\n");
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        perror("recv");
-    }
+    // int nbytes = receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+    // if (nbytes > 0)
+    // {
+    //     buffer[nbytes] = '\0';
+    //     printf("Server response: %s\n", buffer);
+    // }
+    // else if (nbytes == 0)
+    // {
+    //     printf("Server closed the connection\n");
+    //     exit(EXIT_FAILURE);
+    // }
+    // else
+    // {
+    //     perror("recv");
+    // }
+    receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+    printf("Server response: %s\n", buffer);
 }
 
 /**
@@ -57,33 +60,41 @@ void send_command(int sockfd, const char *command)
 void handle_login_command(int sockfd, char *command)
 {
     // Send login command to the server
-    if (send(sockfd, command, strlen(command), 0) == -1)
-    {
-        perror("send");
-        return;
-    }
+    // if (send_message(sockfd, command, strlen(command), 0) == -1)
+    // {
+    //     perror("send");
+    //     return;
+    // }
+    send_message(sockfd, command, strlen(command), 0);
 
     // Wait for server response
     char buffer[BUFFER_SIZE];
-    int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-    if (nbytes > 0)
+    // int nbytes = receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+    // if (nbytes > 0)
+    // {
+    //     buffer[nbytes] = '\0';
+    //     printf("Server response: %s\n", buffer);
+    //     if (strncmp(buffer, "Login successful", 16) == 0)
+    //     {
+    //         sscanf(command, "login %s", current_user);
+    //         printf("logged in as %s\n", current_user);
+    //     }
+    // }
+    // else if (nbytes == 0)
+    // {
+    //     printf("Server closed the connection\n");
+    //     exit(EXIT_FAILURE);
+    // }
+    // else
+    // {
+    //     perror("recv");
+    // }
+    receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+    printf("Server response: %s\n", buffer);
+    if (strncmp(buffer, "Login successful", 16) == 0)
     {
-        buffer[nbytes] = '\0';
-        printf("Server response: %s\n", buffer);
-        if (strncmp(buffer, "Login successful", 16) == 0)
-        {
-            sscanf(command, "login %s", current_user);
-            printf("logged in as %s\n", current_user);
-        }
-    }
-    else if (nbytes == 0)
-    {
-        printf("Server closed the connection\n");
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        perror("recv");
+        sscanf(command, "login %s", current_user);
+        printf("logged in as %s\n", current_user);
     }
 }
 
@@ -94,8 +105,10 @@ void handle_login_command(int sockfd, char *command)
  * @param group_name The name of the group to upload the file to.
  * @param file_path The path to the file to upload.
  */
-void upload_file(int sockfd, const char *group_name, const char *file_path)
+void upload_file(int sockfd, char *group_name, char *file_path)
 {
+
+    printf("uploading file to server ...\n");
     FILE *file = fopen(file_path, "rb");
     if (file == NULL)
     {
@@ -107,12 +120,16 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
 
     char command[BUFFER_SIZE];
     snprintf(command, sizeof(command), "upload_file %s %s", group_name, file_name);
-    if (send(sockfd, command, strlen(command), 0) == -1)
-    {
-        perror("send");
-        fclose(file);
-        return;
-    }
+
+    // if (send(sockfd, command, strlen(command), 0) == -1)
+    // {
+    //     perror("send");
+    //     fclose(file);
+    //     return;
+    // }
+
+    send_message(sockfd, command, strlen(command), 0);
+    printf("command sent\n");
 
     char server_ready[BUFFER_SIZE];
     int nbytes = recv(sockfd, server_ready, sizeof(server_ready) - 1, 0);
@@ -175,6 +192,8 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
         return;
     }
 
+    printf("Uploading file %s to group %s...\n", file_name, group_name);
+
     char buffer[BUFFER_SIZE];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0)
@@ -202,17 +221,13 @@ void upload_file(int sockfd, const char *group_name, const char *file_path)
  * @param group_name The name of the group from which to download the file.
  * @param file_name The name of the file to download.
  */
-void download_file(int sockfd, const char *group_name, const char *file_name)
+void download_file(int sockfd, char *group_name, char *file_name)
 {
     printf("Downloading file %s from group %s...\n", file_name, group_name);
 
     char download_command[BUFFER_SIZE];
     snprintf(download_command, sizeof(download_command), "download_file %s %s", group_name, file_name);
-    if (send(sockfd, download_command, strlen(download_command), 0) == -1)
-    {
-        perror("send");
-        return;
-    }
+    send_message(sockfd, download_command, strlen(download_command), 0);
 
     // Construct the full file path
     char file_path[BUFFER_SIZE];
@@ -226,6 +241,11 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         return;
     }
 
+    // Notify the client that the server is ready
+    send(sockfd, "SERVER_READY", 12, 0);
+    printf("Server ready to receive file\n");
+
+    // Receive the file size from the client
     uint64_t file_size;
     if (recv(sockfd, &file_size, sizeof(file_size), 0) <= 0)
     {
@@ -233,6 +253,10 @@ void download_file(int sockfd, const char *group_name, const char *file_name)
         fclose(file);
         return;
     }
+    printf("File size received: %lu\n", file_size);
+
+    // Notify the client that the file size is received and OK
+    send(sockfd, "SIZE_OK", 7, 0);
 
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
@@ -304,21 +328,23 @@ void handle_chat(int sockfd, char *command)
         if (fds[0].revents & POLLIN)
         {
             char buffer[BUFFER_SIZE];
-            int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-            if (nbytes > 0)
-            {
-                buffer[nbytes] = '\0';
-                printf("%s\n", buffer);
-            }
-            else if (nbytes == 0)
-            {
-                printf("Server closed the connection\n");
-                exit(EXIT_FAILURE);
-            }
-            else
-            {
-                perror("recv");
-            }
+            // int nbytes = receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+            // if (nbytes > 0)
+            // {
+            //     buffer[nbytes] = '\0';
+            //     printf("%s\n", buffer);
+            // }
+            // else if (nbytes == 0)
+            // {
+            //     printf("Server closed the connection\n");
+            //     exit(EXIT_FAILURE);
+            // }
+            // else
+            // {
+            //     perror("recv");
+            // }
+            receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+            printf("%s\n", buffer);
         }
 
         if (fds[1].revents & POLLIN)
@@ -330,7 +356,7 @@ void handle_chat(int sockfd, char *command)
             {
                 char exit_command[BUFFER_SIZE];
                 snprintf(exit_command, sizeof(exit_command), "message %s %s %d %s", group_name, current_user, 0, command);
-                send(sockfd, exit_command, strlen(exit_command), 0);
+                send_message(sockfd, exit_command, strlen(exit_command), 0);
                 printf("Leaving group %s...\n", group_name);
                 break;
             }
@@ -352,34 +378,37 @@ void handle_chat(int sockfd, char *command)
             {
                 char list_files_command[BUFFER_SIZE];
                 snprintf(list_files_command, sizeof(list_files_command), "list_files %s", group_name);
-                send(sockfd, list_files_command, strlen(list_files_command), 0);
+                send_message(sockfd, list_files_command, strlen(list_files_command), 0);
 
                 char buffer[BUFFER_SIZE];
-                int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-                if (nbytes > 0)
-                {
-                    buffer[nbytes] = '\0';
-                    printf("%s\n", buffer);
-                }
-                else if (nbytes == 0)
-                {
-                    printf("Server closed the connection\n");
-                    exit(EXIT_FAILURE);
-                }
-                else
-                {
-                    perror("recv");
-                }
+                // int nbytes = receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+                // if (nbytes > 0)
+                // {
+                //     buffer[nbytes] = '\0';
+                //     printf("%s\n", buffer);
+                // }
+                // else if (nbytes == 0)
+                // {
+                //     printf("Server closed the connection\n");
+                //     exit(EXIT_FAILURE);
+                // }
+                // else
+                // {
+                //     perror("recv");
+                // }
+                receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+                printf("%s\n", buffer);
             }
             else
             {
                 char message_command[BUFFER_SIZE];
                 snprintf(message_command, sizeof(message_command), "message %s %s %d %s", group_name, current_user, 1, command);
-                if (send(sockfd, message_command, strlen(message_command), 0) == -1)
-                {
-                    perror("send");
-                    break;
-                }
+                // if (send_message(sockfd, message_command, strlen(message_command), 0) == -1)
+                // {
+                //     perror("send");
+                //     break;
+                // }
+                send_message(sockfd, message_command, strlen(message_command), 0);
             }
         }
     }
@@ -403,34 +432,41 @@ void handle_join_command(int sockfd, char *command)
         char join_command[BUFFER_SIZE];
         snprintf(join_command, sizeof(join_command), "join_group %s %s", current_user, command + 11);
 
-        if (send(sockfd, join_command, strlen(join_command), 0) == -1)
-        {
-            perror("send");
-            return;
-        }
+        // if (send_message(sockfd, join_command, strlen(join_command), 0) == -1)
+        // {
+        //     perror("send");
+        //     return;
+        // }
+        send_message(sockfd, join_command, strlen(join_command), 0);
 
         char buffer[BUFFER_SIZE];
-        int nbytes = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+        // int nbytes = receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
 
-        if (nbytes > 0)
+        // if (nbytes > 0)
+        // {
+        //     buffer[nbytes] = '\0';
+        //     buffer[strcspn(buffer, "\n")] = '\0';
+        //     printf("Server response: %s\n", buffer);
+        //     if (strncmp(buffer, "Joined group successfully", 25) == 0)
+        //     {
+        //         sscanf(command, "join_group %s", group_name);
+        //         handle_chat(sockfd, command);
+        //     }
+        // }
+        // else if (nbytes == 0)
+        // {
+        //     printf("Server closed the connection\n");
+        //     exit(EXIT_FAILURE);
+        // }
+        // else
+        // {
+        //     perror("recv");
+        // }
+        receive_message(sockfd, buffer, sizeof(buffer) - 1, 0);
+        if (strncmp(buffer, "Joined group successfully", 25) == 0)
         {
-            buffer[nbytes] = '\0';
-            buffer[strcspn(buffer, "\n")] = '\0';
-            printf("Server response: %s\n", buffer);
-            if (strncmp(buffer, "Joined group successfully", 25) == 0)
-            {
-                sscanf(command, "join_group %s", group_name);
-                handle_chat(sockfd, command);
-            }
-        }
-        else if (nbytes == 0)
-        {
-            printf("Server closed the connection\n");
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
-            perror("recv");
+            sscanf(command, "join_group %s", group_name);
+            handle_chat(sockfd, command);
         }
     }
 }

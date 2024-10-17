@@ -51,6 +51,7 @@ int read_int_from_socket(int fd)
         bytes_read = read(fd, ((char *)&val) + total_bytes_read, size - total_bytes_read);
         if (bytes_read == 0)
             return 0;
+
         print_error(bytes_read, "read_int");
         total_bytes_read += bytes_read;
     }
@@ -69,4 +70,25 @@ void write_int_as_message(int fd, int val)
         print_error(temp_send, "write_int");
         send += temp_send;
     }
+}
+
+void send_message(int fd, char *message, int size, int flag)
+{
+    write_int_as_message(fd, size);
+    printf("Message size: %d\n", size);
+    write_on_socket(fd, message);
+}
+
+void receive_message(int fd, char *buffer, int size, int flag)
+{
+    int message_size = read_int_from_socket(fd);
+    printf("Message size: %d\n", message_size);
+
+    int read_status = read_message_from_socket(fd, buffer, message_size);
+    if (read_status <= 0)
+    {
+        printf("Server disconnected or error occurred.\n");
+        exit(EXIT_FAILURE);
+    }
+    buffer[message_size] = '\0';
 }
