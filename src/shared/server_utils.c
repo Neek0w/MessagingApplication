@@ -432,6 +432,26 @@ int get_client_fd_by_username(const char *username)
     return -1;
 }
 
+void remove_client_from_all_groups(int client_fd)
+{
+    for (int i = 0; i < group_count; i++)
+    {
+        for (int j = 0; j < groups[i].member_count; j++)
+        {
+            if (clients[get_client_fd_by_username(groups[i].members[j])].fd == client_fd)
+            {
+                // Shift members to remove the client
+                for (int k = j; k < groups[i].member_count - 1; k++)
+                {
+                    strcpy(groups[i].members[k], groups[i].members[k + 1]);
+                }
+                groups[i].member_count--;
+                j--; // Adjust index after removal
+            }
+        }
+    }
+}
+
 /**
  * @brief Handles messages sent within a group.
  *
@@ -522,12 +542,24 @@ void handle_client(int client_fd)
 {
     char buffer[BUFFER_SIZE];
     printf("\n\nAwaiting for recv ...\n\n");
-    // int nbytes = receive_message(client_fd, buffer, sizeof(buffer), 0);
-    // if (nbytes > 0)
-    // {
-    //     buffer[nbytes] = '\0';
 
     receive_message(client_fd, buffer, sizeof(buffer), 0);
+
+    if (strlen(buffer) == 0)
+    {
+        remove_client_from_all_groups(client_fd);
+        remove_client(client_fd);
+        printf("Client or server disconnected : %d\n", client_fd);
+
+        if (client_fd != OTHER_SERVER_FD)
+        {
+            char remove_command[BUFFER_SIZE];
+            snprintf(remove_command, sizeof(remove_command), "remove_client %d\n", client_fd);
+            send_message(OTHER_SERVER_FD, remove_command, strlen(remove_command), 0);
+        }
+        close(client_fd);
+        return;
+    }
 
     if (client_fd == OTHER_SERVER_FD)
     {
@@ -545,30 +577,12 @@ void handle_client(int client_fd)
     {
         // Forward the command to the second server
         printf("sending command to server\n");
-        // if (send_message(OTHER_SERVER_FD, buffer, nbytes, 0) == -1)
-        // {
-        //     perror("send to second server");
-        // }
         send_message(OTHER_SERVER_FD, buffer, strlen(buffer), 0);
 
         // Receive response from the second server
         char response[BUFFER_SIZE];
         printf("\n\nAwaiting for recv ...\n\n");
 
-        // int response_bytes = receive_message(OTHER_SERVER_FD, response, sizeof(response) - 1, 0);
-        // if (response_bytes > 0)
-        // {
-        //     response[response_bytes] = '\0';
-        //     printf("Received response from second server: %s\n", response);
-        // }
-        // else if (response_bytes == 0)
-        // {
-        //     printf("Second server disconnected\n");
-        // }
-        // else
-        // {
-        //     perror("recv from second server");
-        // }
         receive_message(OTHER_SERVER_FD, response, sizeof(response), 0);
     }
 
@@ -627,6 +641,14 @@ void handle_client(int client_fd)
             handle_upload_file(OTHER_SERVER_FD, arg1, arg2);
             printf("done uploading file from other server\n");
         }
+        else if (client_fd == OTHER_SERVER_FD && strcmp(command, "remove_client") == 0)
+        {
+            int fd_to_remove;
+            sscanf(arg1, "%d", &fd_to_remove);
+            remove_client_from_all_groups(fd_to_remove);
+            remove_client(fd_to_remove);
+            printf("Client removed by other server: %d\n", fd_to_remove);
+        }
         else
         {
             if (client_fd != OTHER_SERVER_FD)
@@ -640,18 +662,8 @@ void handle_client(int client_fd)
 
             send_message(client_fd, "Invalid command format\n", 23, 0);
     }
-    // }
-    // else if (nbytes == 0)
-    // {
-    //     printf("Client %d disconnected\n", client_fd);
-    //     remove_client(client_fd);
-    //     close(client_fd);
-    // }
-    // else
-    // {
-    //     perror("recv");
-    // }
-    // memset(buffer, 0, sizeof(buffer));
+
+    memset(buffer, 0, sizeof(buffer));
 }
 
 /**

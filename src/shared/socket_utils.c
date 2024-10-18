@@ -5,7 +5,7 @@ void print_error(int result, char *s)
     if (result < 0)
     {
         perror(s);
-        exit(EXIT_FAILURE);
+        // exit(EXIT_FAILURE);
     }
 }
 
@@ -88,7 +88,7 @@ void receive_message(int fd, char *buffer, int size, int flag)
     if (read_status <= 0)
     {
         printf("Server disconnected or error occurred.\n");
-        exit(EXIT_FAILURE);
+        // exit(EXIT_FAILURE);
     }
     buffer[message_size] = '\0';
 }
