@@ -2,11 +2,12 @@ CC = gcc
 CFLAGS = -Wall -g -Ishared
 LDFLAGS = -lpthread
 
-all: server client server2 client2 drive
+all: directories server client server2 client2
 
-drive:
+directories:
 	mkdir -p region1/server/drive/
 	mkdir -p region2/server2/drive/
+	mkdir -p obj/
 
 server: region1/server/server.exe
 

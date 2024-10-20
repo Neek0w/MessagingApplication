@@ -1,3 +1,9 @@
+/**
+ * @file server_utils.c
+ * @brief Utility functions for server operations.
+ *
+ * Detailed description of the file's purpose and contents.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

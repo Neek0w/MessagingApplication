@@ -1,5 +1,5 @@
 /**
- * @file chat_client.c
+ * @file client.c
  * @brief A simple chat client with file upload and download functionality.
  *
  * This client allows users to log in, join groups, send messages, and upload/download files to/from a server.

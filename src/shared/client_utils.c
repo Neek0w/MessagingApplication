@@ -1,3 +1,10 @@
+/**
+ * @file client_utils.c
+ * @brief This file contains the implementation of the specified functionality.
+ *
+ * Detailed description of the file's purpose and contents.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

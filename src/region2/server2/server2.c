@@ -1,3 +1,33 @@
+/**
+ * @file server2.c
+ * @brief This file implements a multi-client server with functionalities for user authentication,
+ *        file uploads/downloads, group management, and message handling between clients.
+ *
+ * The server communicates with a secondary server to ensure data synchronization and load balancing.
+ * Clients can perform various actions such as login, user creation, file management, and joining groups.
+ * Commands received from clients are handled and processed, with some forwarded to the secondary server.
+ *
+ * @details
+ * - User Authentication: Clients can log in or create new accounts.
+ * - Group Management: Clients can create or join groups, list available groups, and exchange messages.
+ * - File Management: Clients can upload or download files to/from specific groups.
+ * - Server Communication: Handles synchronization between the primary and secondary server.
+ * - Handles multiple clients simultaneously using the `poll` mechanism.
+ *
+ * @note This server listens on two ports (one for clients and one for communication with another server).
+ *
+ * @dependencies
+ * - Standard C libraries: `<stdio.h>`, `<stdlib.h>`, `<string.h>`, `<unistd.h>`, `<arpa/inet.h>`,
+ *   `<poll.h>`, `<dirent.h>`, `<sys/types.h>`, `<sys/stat.h>`
+ * - Custom `database.h`: A custom header for user and group data handling.
+ *
+ * @authors
+ * Author Name: LUNET Louis, EGLOFF Nicolas
+ *
+ * @date
+ * 16/10/2024
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +42,16 @@
 
 #define PORT 8081
 
+
+/**
+ * @brief Main entry point for the server application.
+ *
+ * Initializes the server, sets up socket connections, and handles incoming client requests
+ * using a polling mechanism. The server also communicates with a secondary server to manage
+ * load balancing and synchronization.
+ *
+ * @return int Returns 0 on successful execution, or exits with an error code.
+ */
 int main()
 {
 

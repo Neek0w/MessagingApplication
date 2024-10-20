@@ -1,3 +1,10 @@
+/**
+ * @file server_utils.h
+ * @brief Header file containing utility functions for server operations.
+ * 
+ * Detailed description of the file's purpose and contents.
+ */
+
 #ifndef SERVER_UTILS_H
 #define SERVER_UTILS_H
 

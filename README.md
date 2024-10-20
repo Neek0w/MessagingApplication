@@ -53,8 +53,8 @@ To install and compile the project, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository_url>
-   cd <project_directory>
+   git clone https://github.com/Neek0w/kamikaze.git
+   cd kamikaze/src/
    ```
 
 2. **Compile the code**:
@@ -64,9 +64,16 @@ To install and compile the project, follow these steps:
    ```
 
 3. **Run the program**:
-   Execute the compiled binary to start the server:
+   Run compiled binaries to start servers and clients, each in a new terminal.:
    ```bash
-   ./<executable_name>
+   cd ./region2/server2/
+   ./server2.exe
+   cd ./region1/server/
+   ./server.exe
+   cd ./region2/client2/
+   ./client2.exe
+   cd ./region1/client/
+   ./client.exe
    ```
 
 ## User Interaction Guide 📝

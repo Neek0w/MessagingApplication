@@ -1,3 +1,9 @@
+/**
+ * @file client_utils.h
+ * @brief Utility functions for client operations.
+ *
+ * Detailed description of the file's purpose and contents.
+ */
 #ifndef CLIENT_UTILS_H
 #define CLIENT_UTILS_H
 

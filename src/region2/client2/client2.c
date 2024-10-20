@@ -1,4 +1,10 @@
-
+/**
+ * @file client2.c
+ * @brief A simple chat client with file upload and download functionality.
+ *
+ * This client allows users to log in, join groups, send messages, and upload/download files to/from a server.
+ * It uses TCP sockets for communication with the server.
+ */
 #include "client_utils.h"
 
 // Define server2 IP and port
@@ -7,6 +13,13 @@
 
 #define BUFFER_SIZE 8192
 
+/**
+ * @brief The main function for the chat client program.
+ *
+ * It establishes a connection to the server and provides an interface for the user to log in and interact with groups.
+ *
+ * @return int 0 on success, non-zero on failure.
+ */
 int main(int argc, char *argv[])
 {
 
